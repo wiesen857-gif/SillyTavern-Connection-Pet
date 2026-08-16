@@ -4,8 +4,11 @@ import { listPresetPrompts, requireTavernHelper } from './preset-operations.js';
 const byId = id => document.getElementById(id);
 const option = (value, label) => Object.assign(document.createElement('option'), { value, textContent: label });
 
+// SillyTavern 1.16.0, public/index.html: #extensions_settings.
+export const findExtensionSettingsContainer = documentLike => documentLike.getElementById('extensions_settings');
+
 export async function mountSettingsPanel(app) {
-  const host = document.querySelector('.extensions_settings');
+  const host = findExtensionSettingsContainer(document);
   if (!host) throw new Error('找不到 SillyTavern 扩展设置容器');
   const html = await fetch(new URL('../settings.html', import.meta.url)).then(response => {
     if (!response.ok) throw new Error(`设置模板加载失败：${response.status}`);
