@@ -1,0 +1,10 @@
+{
+  "name": "sillytavern-connection-pet",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check index.js && node --check src/settings.js && node --check src/preset-operations.js && node --check src/host-adapter.js && node --check src/settings-panel.js && node --check src/pet-widget.js"
+  }
+}

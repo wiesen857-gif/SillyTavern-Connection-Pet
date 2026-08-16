@@ -1,0 +1,14 @@
+{
+  "display_name": "连接桌宠",
+  "loading_order": 110,
+  "requires": [],
+  "dependencies": ["third-party/JS-Slash-Runner"],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "wiesen857-gif",
+  "version": "0.1.0",
+  "homePage": "https://github.com/wiesen857-gif/SillyTavern-Connection-Pet",
+  "auto_update": true,
+  "minimum_client_version": "1.16.0"
+}

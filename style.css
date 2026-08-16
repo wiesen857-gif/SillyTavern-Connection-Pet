@@ -1,0 +1,52 @@
+:root {
+  --cp-pink: #ead8e2;
+  --cp-pink-strong: #c990ad;
+  --cp-mauve: #8b5773;
+  --cp-ink: #382b35;
+  --cp-panel: rgba(43, 32, 40, 0.97);
+  --cp-line: rgba(234, 216, 226, 0.2);
+}
+
+.connection-pet-settings { margin: 8px 0; }
+.connection-pet-settings .inline-drawer-header { color: var(--cp-pink); }
+.connection-pet-settings .inline-drawer-content { padding: 8px 4px 14px; }
+.cp-intro, .cp-hint { color: var(--SmartThemeBodyColor); opacity: .72; font-size: .9em; line-height: 1.45; }
+.cp-section { margin: 12px 0; padding: 12px; border: 1px solid var(--cp-line); border-radius: 12px; background: rgba(201, 144, 173, .06); }
+.cp-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 9px; color: var(--cp-pink); font-weight: 700; }
+.cp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin-top: 9px; }
+.cp-grid label, .cp-tab-panel label { display: grid; gap: 4px; font-size: .88em; }
+.cp-grid .cp-wide { grid-column: 1 / -1; }
+.cp-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.cp-primary { background: var(--cp-mauve) !important; color: #fff !important; border-color: var(--cp-pink-strong) !important; }
+.cp-danger { color: #efb5bb !important; }
+.cp-prompt-list { display: grid; gap: 5px; max-height: 250px; margin-top: 9px; overflow: auto; }
+.cp-prompt-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 34px; padding: 5px 8px; border-radius: 8px; background: rgba(255,255,255,.045); }
+.cp-prompt-row small { opacity: .6; }
+.cp-prompt-row.is-stale { color: #dca4ab; opacity: .82; }
+.cp-status { min-height: 1.4em; margin-top: 8px; color: #b9dfbd; font-size: .88em; }
+.cp-status.is-error { color: #f1a8b0; }
+
+#connection-pet-root { position: fixed; left: var(--cp-x); top: var(--cp-y); z-index: 32000; width: var(--cp-size); height: var(--cp-size); touch-action: none; }
+#connection-pet-root[hidden] { display: none; }
+.cp-pet { position: absolute; inset: 0; width: 100%; height: 100%; padding: 0; border: 1px solid rgba(255,255,255,.86); border-radius: 50%; background: var(--cp-pink); box-shadow: 0 8px 24px rgba(52, 33, 45, .28); cursor: grab; overflow: hidden; transition: transform .16s ease, box-shadow .16s ease; }
+.cp-pet:hover { transform: translateY(-2px); box-shadow: 0 11px 28px rgba(52, 33, 45, .36); }
+.cp-pet:active { cursor: grabbing; }
+.cp-pet img { display: block; width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
+.cp-pet-dot { position: absolute; right: 5%; bottom: 8%; width: 13%; aspect-ratio: 1; border: 2px solid #fff; border-radius: 50%; background: #69b77b; }
+.cp-popover { position: absolute; top: calc(100% + 10px); right: 0; width: min(330px, calc(100vw - 24px)); padding: 12px; border: 1px solid rgba(234,216,226,.35); border-radius: 16px; color: #f5eaf0; background: var(--cp-panel); box-shadow: 0 18px 46px rgba(0,0,0,.42); touch-action: auto; }
+#connection-pet-root.is-left .cp-popover { left: 0; right: auto; }
+.cp-popover[hidden], .cp-tab-panel[hidden] { display: none; }
+.cp-popover-head { display: flex; align-items: center; justify-content: space-between; color: var(--cp-pink); }
+.cp-close { width: 30px; height: 30px; border: 0; color: inherit; background: transparent; font-size: 22px; cursor: pointer; }
+.cp-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin: 10px 0; padding: 3px; border-radius: 10px; background: rgba(255,255,255,.055); }
+.cp-tabs button { padding: 7px; border: 0; border-radius: 8px; color: #d7c6cf; background: transparent; cursor: pointer; }
+.cp-tabs button.is-active { color: var(--cp-ink); background: var(--cp-pink); font-weight: 700; }
+.cp-tab-panel { display: grid; gap: 9px; }
+.cp-profile-summary { min-height: 48px; padding: 8px; border-radius: 9px; background: rgba(255,255,255,.045); white-space: pre-line; word-break: break-all; font-size: .84em; opacity: .82; }
+.cp-empty { margin: 8px 0; text-align: center; opacity: .65; }
+
+@media (max-width: 600px) {
+  .cp-grid { grid-template-columns: 1fr; }
+  .cp-grid .cp-wide { grid-column: auto; }
+  .cp-popover { position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; max-height: 72vh; overflow: auto; }
+}
