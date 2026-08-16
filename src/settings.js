@@ -1,16 +1,21 @@
 export const SETTINGS_KEY = 'connectionPet';
 
 export const DEFAULT_SETTINGS = Object.freeze({
-  version: 1,
+  version: 2,
   enabled: true,
   pet: Object.freeze({ x: null, y: null, size: 58 }),
-  activeProfileId: null,
+  activeProfileRef: null,
   profiles: Object.freeze([]),
   presetAllowlist: Object.freeze({}),
 });
 
 const text = value => typeof value === 'string' ? value.trim() : '';
 const position = value => Number.isFinite(value) && value >= 0 ? value : null;
+const normalizeProfileRef = value => {
+  const source = text(value?.source);
+  const id = text(value?.id);
+  return ['local', 'native'].includes(source) && id ? { source, id } : null;
+};
 
 export function normalizeSettings(raw) {
   const source = raw && typeof raw === 'object' ? raw : {};
@@ -39,15 +44,20 @@ export function normalizeSettings(raw) {
     }
   }
 
+  const activeProfileRef = normalizeProfileRef(source.activeProfileRef)
+    ?? (profiles.some(item => item.id === source.activeProfileId)
+      ? { source: 'local', id: source.activeProfileId }
+      : null);
+
   return {
-    version: 1,
+    version: 2,
     enabled: source.enabled !== false,
     pet: {
       x: position(source.pet?.x),
       y: position(source.pet?.y),
       size: Math.min(72, Math.max(40, Number.isFinite(source.pet?.size) ? source.pet.size : 58)),
     },
-    activeProfileId: profiles.some(item => item.id === source.activeProfileId) ? source.activeProfileId : null,
+    activeProfileRef,
     profiles,
     presetAllowlist,
   };
