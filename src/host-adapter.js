@@ -10,6 +10,11 @@ export function validateCommandValue(value) {
   return normalized;
 }
 
+export function readNativeConnectionProfiles(context) {
+  const rows = context.extensionSettings?.connectionManager?.profiles;
+  return Array.isArray(rows) ? [...rows] : [];
+}
+
 const quoted = value => `"${validateCommandValue(value)}"`;
 
 export async function applyCustomProfile(host, profile) {
@@ -18,6 +23,10 @@ export async function applyCustomProfile(host, profile) {
   let parsed;
   try { parsed = new URL(apiUrl); } catch { throw new Error('API 地址不是有效 URL'); }
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('API 地址仅支持 http 或 https');
+
+  if (profile.secretId && typeof host.hasSecret === 'function' && !host.hasSecret(profile.secretId)) {
+    throw new Error('配置引用的酒馆 Secret 已不存在或不可用');
+  }
 
   await host.run(`/api-url api=custom connect=false quiet=true ${quoted(apiUrl)}`);
   if (profile.secretId) await host.rotateSecret(CUSTOM_SECRET_KEY, validateCommandValue(profile.secretId));
@@ -32,6 +41,12 @@ export async function createBrowserHost() {
     throw new Error('需要 SillyTavern 1.16.0 或更高版本');
   }
   const secrets = await import('/scripts/secrets.js');
+  const getSecrets = () => {
+    const rows = secrets.secret_state?.[secrets.SECRET_KEYS.CUSTOM];
+    return Array.isArray(rows)
+      ? rows.map(row => ({ id: row.id, label: row.label, active: Boolean(row.active) }))
+      : [];
+  };
   return {
     context,
     helper: globalThis.TavernHelper,
@@ -41,9 +56,8 @@ export async function createBrowserHost() {
       if (!String(value ?? '').trim()) return '';
       return await secrets.writeSecret(secrets.SECRET_KEYS.CUSTOM, String(value), String(label || '连接桌宠')) || '';
     },
-    getSecrets() {
-      const rows = secrets.secret_state?.[secrets.SECRET_KEYS.CUSTOM];
-      return Array.isArray(rows) ? rows.map(row => ({ id: row.id, label: row.label, active: Boolean(row.active) })) : [];
-    },
+    getSecrets,
+    hasSecret: id => getSecrets().some(row => row.id === id),
+    getNativeConnectionProfiles: () => readNativeConnectionProfiles(context),
   };
 }
