@@ -32,6 +32,7 @@ test('exposes only the tagged-reference profile application entry', async () => 
   assert.equal(app.applyProfile, undefined);
   assert.equal(typeof app.applyProfileRef, 'function');
   assert.equal(typeof app.fetchModels, 'function');
+  assert.equal(typeof app.updateNativeProfile, 'function');
   await app.applyProfileRef({ source: 'native', id: 'native-1' });
 
   assert.deepEqual(calls, [

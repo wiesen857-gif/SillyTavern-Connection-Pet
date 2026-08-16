@@ -17,6 +17,11 @@ test('normalizes malformed settings without retaining plaintext API keys', () =>
   assert.equal(serializeSettings(value).includes('must-not-survive'), false);
 });
 
+test('drops legacy profile notes from normalized settings', () => {
+  const value = normalizeSettings({ profiles: [{ id: 'p1', name: '配置', apiUrl: 'https://example.test/v1', model: 'm', note: '旧备注' }] });
+  assert.equal('note' in value.profiles[0], false);
+});
+
 test('returns independent defaults', () => {
   const first = normalizeSettings(null);
   first.pet.size = 70;

@@ -8,4 +8,5 @@ test('settings offers model retrieval without an API apply action', async () => 
   assert.match(html, /id="cp-fetch-models"/);
   assert.match(html, /id="cp-model-options"/);
   assert.doesNotMatch(html, /id="cp-apply-profile"/);
+  assert.doesNotMatch(html, /id="cp-profile-note"/);
 });

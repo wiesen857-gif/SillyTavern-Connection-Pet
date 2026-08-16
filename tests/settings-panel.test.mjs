@@ -25,10 +25,10 @@ test('builds non-empty native and local selector groups', () => {
   assert.match(groups[1].options[0].value, /^local:/);
 });
 
-test('native selection is read-only while local selection is editable', () => {
+test('native and local profiles are editable but only local profiles can be deleted', () => {
   assert.deepEqual(settingsPanel.getProfileEditState({ source: 'native' }), {
-    readOnly: true,
-    canSave: false,
+    readOnly: false,
+    canSave: true,
     canDelete: false,
     canCopy: true,
   });

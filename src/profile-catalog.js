@@ -27,8 +27,6 @@ function normalizeLocal(row) {
     apiUrl: text(row.apiUrl),
     model: text(row.model),
     secretId: text(row.secretId),
-    note: text(row.note),
-    readOnly: false,
   };
 }
 
@@ -45,8 +43,6 @@ function normalizeNative(row) {
     apiUrl,
     model,
     secretId: text(row['secret-id']),
-    note: '',
-    readOnly: true,
   };
 }
 

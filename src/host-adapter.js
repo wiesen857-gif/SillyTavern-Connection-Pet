@@ -1,7 +1,8 @@
 const CUSTOM_SECRET_KEY = 'api_key_custom';
 
 // Version-pinned host contract: SillyTavern 1.16.0 (e3b866b),
-// public/scripts/openai.js, public/scripts/slash-commands.js and public/scripts/secrets.js.
+// public/scripts/openai.js, public/scripts/slash-commands.js, public/scripts/secrets.js,
+// public/scripts/events.js and public/scripts/extensions/connection-manager/index.js.
 
 export function validateCommandValue(value) {
   const normalized = String(value ?? '').trim();
@@ -96,6 +97,32 @@ export async function fetchCustomModels(host, request) {
   }
 }
 
+export async function updateNativeConnectionProfile(host, profileId, changes) {
+  const id = validateCommandValue(profileId);
+  const name = validateCommandValue(changes?.name);
+  const apiUrl = validateApiUrl(changes?.apiUrl);
+  const model = validateCommandValue(changes?.model);
+  const secretId = changes?.secretId ? validateCommandValue(changes.secretId) : '';
+  const rows = host.getNativeConnectionProfiles();
+  const profile = rows.find(row => row?.id === id);
+
+  if (!profile || profile.mode !== 'cc' || profile.api !== 'custom') {
+    throw new Error('所选酒馆 Custom 配置已不存在或不受支持');
+  }
+  if (rows.some(row => row?.id !== id && row?.name === name)) {
+    throw new Error('酒馆中已存在同名连接配置');
+  }
+  if (secretId && !host.getSecrets().some(row => row.id === secretId)) {
+    throw new Error('配置引用的酒馆 Secret 已不存在或不可用');
+  }
+
+  const oldProfile = structuredClone(profile);
+  Object.assign(profile, { name, 'api-url': apiUrl, model, 'secret-id': secretId });
+  host.saveSettings();
+  await host.emitConnectionProfileUpdated(oldProfile, profile);
+  return profile;
+}
+
 export async function createBrowserHost() {
   const context = globalThis.SillyTavern?.getContext?.();
   if (!context?.extensionSettings || typeof context.executeSlashCommandsWithOptions !== 'function') {
@@ -120,6 +147,14 @@ export async function createBrowserHost() {
     getSecrets,
     hasSecret: id => getSecrets().some(row => row.id === id),
     getConnectionStatus: () => globalThis.SillyTavern?.getContext?.()?.onlineStatus,
+    saveSettings: () => context.saveSettingsDebounced(),
+    emitConnectionProfileUpdated: (oldProfile, newProfile) => {
+      const eventName = context.eventTypes?.CONNECTION_PROFILE_UPDATED;
+      if (!eventName || typeof context.eventSource?.emit !== 'function') {
+        throw new Error('当前 SillyTavern 不支持更新连接配置事件');
+      }
+      return context.eventSource.emit(eventName, oldProfile, newProfile);
+    },
     async requestCustomModels(apiUrl) {
       // SillyTavern 1.16.0, src/endpoints/backends/chat-completions.js:
       // POST /api/backends/chat-completions/status proxies Custom /models requests.

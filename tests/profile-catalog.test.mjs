@@ -14,7 +14,7 @@ const nativeRows = [
   { id: 'text', name: 'Text Completion', mode: 'tc', api: 'custom', 'api-url': 'https://example.test/v1', model: 'x' },
   { id: 'empty-model', name: '缺模型', mode: 'cc', api: 'custom', 'api-url': 'https://example.test/v1', model: '' },
 ];
-const localRows = [{ id: 'same', name: '桌宠配置', apiUrl: 'http://127.0.0.1:1234/v1', model: 'local-model', secretId: '', note: 'local' }];
+const localRows = [{ id: 'same', name: '桌宠配置', apiUrl: 'http://127.0.0.1:1234/v1', model: 'local-model', secretId: '' }];
 
 test('catalog keeps only valid cc/custom native rows and strips unrelated fields', () => {
   const catalog = listProfileCatalog(localRows, nativeRows);
@@ -26,8 +26,6 @@ test('catalog keeps only valid cc/custom native rows and strips unrelated fields
     apiUrl: 'https://example.test/v1',
     model: 'native-model',
     secretId: 'secret-1',
-    note: '',
-    readOnly: true,
   });
   assert.equal('preset' in catalog.native[0], false);
   assert.equal('proxy' in catalog.native[0], false);

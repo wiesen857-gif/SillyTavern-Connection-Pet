@@ -26,7 +26,6 @@ export function normalizeSettings(raw) {
       apiUrl: text(item.apiUrl),
       model: text(item.model),
       secretId: text(item.secretId),
-      note: text(item.note),
     }))
     : [];
   const presetAllowlist = {};

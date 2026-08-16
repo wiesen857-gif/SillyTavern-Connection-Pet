@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyCustomProfile, fetchCustomModels, readNativeConnectionProfiles, validateCommandValue } from '../src/host-adapter.js';
+import { applyCustomProfile, fetchCustomModels, readNativeConnectionProfiles, updateNativeConnectionProfile, validateCommandValue } from '../src/host-adapter.js';
 import { resolveProfileRef } from '../src/profile-catalog.js';
 
 test('applies only Custom Chat Completion fields and rotates the native secret', async () => {
@@ -279,4 +279,54 @@ test('rejects an empty Custom model list with a manual-entry hint', async () => 
     () => fetchCustomModels(host, { apiUrl: 'https://example.test/v1', secretId: '' }),
     /未获取到可用模型.*手动填写模型 ID/,
   );
+});
+
+test('updates only editable fields of a native Custom profile and emits the host event', async () => {
+  const row = {
+    id: 'native-1', name: '旧名称', mode: 'cc', api: 'custom',
+    'api-url': 'https://old.example/v1', model: 'old-model', 'secret-id': 'old-secret',
+    preset: '必须保留', proxy: '也必须保留', exclude: ['preset'],
+  };
+  const events = [];
+  let saves = 0;
+  const host = {
+    getNativeConnectionProfiles: () => [row],
+    getSecrets: () => [{ id: 'new-secret' }],
+    saveSettings: () => { saves += 1; },
+    emitConnectionProfileUpdated: async (oldProfile, newProfile) => events.push([oldProfile, structuredClone(newProfile)]),
+  };
+
+  const updated = await updateNativeConnectionProfile(host, 'native-1', {
+    name: '新名称', apiUrl: 'https://new.example/v1', model: 'new-model', secretId: 'new-secret',
+  });
+
+  assert.equal(updated, row);
+  assert.deepEqual(row, {
+    id: 'native-1', name: '新名称', mode: 'cc', api: 'custom',
+    'api-url': 'https://new.example/v1', model: 'new-model', 'secret-id': 'new-secret',
+    preset: '必须保留', proxy: '也必须保留', exclude: ['preset'],
+  });
+  assert.equal(saves, 1);
+  assert.equal(events.length, 1);
+  assert.equal(events[0][0].name, '旧名称');
+  assert.equal(events[0][1].name, '新名称');
+});
+
+test('rejects invalid or duplicate native profile updates without mutating host settings', async () => {
+  const rows = [
+    { id: 'native-1', name: '原配置', mode: 'cc', api: 'custom', 'api-url': 'https://old.example/v1', model: 'old' },
+    { id: 'native-2', name: '已存在', mode: 'cc', api: 'custom', 'api-url': 'https://other.example/v1', model: 'other' },
+  ];
+  const before = structuredClone(rows);
+  const host = { getNativeConnectionProfiles: () => rows, getSecrets: () => [], saveSettings() { throw new Error('不应保存'); } };
+
+  await assert.rejects(
+    () => updateNativeConnectionProfile(host, 'native-1', { name: '已存在', apiUrl: 'https://new.example/v1', model: 'new', secretId: '' }),
+    /同名/,
+  );
+  await assert.rejects(
+    () => updateNativeConnectionProfile(host, 'native-1', { name: '新名称', apiUrl: 'javascript:bad', model: 'new', secretId: '' }),
+    /http 或 https/,
+  );
+  assert.deepEqual(rows, before);
 });

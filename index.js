@@ -1,4 +1,4 @@
-import { applyCustomProfile, createBrowserHost, fetchCustomModels } from './src/host-adapter.js';
+import { applyCustomProfile, createBrowserHost, fetchCustomModels, updateNativeConnectionProfile } from './src/host-adapter.js';
 import { listProfileCatalog, resolveProfileRef } from './src/profile-catalog.js';
 import { normalizeSettings, SETTINGS_KEY } from './src/settings.js';
 import { requireTavernHelper } from './src/preset-operations.js';
@@ -20,6 +20,7 @@ export function createApp(host, settings, save, refreshPet) {
       return profile;
     },
     fetchModels: request => fetchCustomModels(host, request),
+    updateNativeProfile: (id, changes) => updateNativeConnectionProfile(host, id, changes),
     refreshPet,
   };
 }

@@ -18,10 +18,9 @@ export function makeProfileGroups(catalog) {
 }
 
 export function getProfileEditState(profile) {
-  const readOnly = profile?.source === PROFILE_SOURCE.NATIVE;
   return {
-    readOnly,
-    canSave: !readOnly,
+    readOnly: false,
+    canSave: true,
     canDelete: profile?.source === PROFILE_SOURCE.LOCAL,
     canCopy: Boolean(profile),
   };
@@ -47,7 +46,7 @@ export async function mountSettingsPanel(app) {
     enabled: byId('cp-enabled'), profiles: byId('cp-profile-select'), name: byId('cp-profile-name'),
     url: byId('cp-profile-url'), model: byId('cp-profile-model'), modelOptions: byId('cp-model-options'),
     fetchModels: byId('cp-fetch-models'), secret: byId('cp-profile-secret'),
-    key: byId('cp-profile-key'), note: byId('cp-profile-note'), source: byId('cp-profile-source'),
+    key: byId('cp-profile-key'), source: byId('cp-profile-source'),
     preset: byId('cp-preset-select'),
     prompts: byId('cp-prompt-list'), status: byId('cp-settings-status'),
     saveProfile: byId('cp-save-profile'), copyProfile: byId('cp-copy-profile'),
@@ -87,12 +86,11 @@ export async function mountSettingsPanel(app) {
     fields.url.value = profile?.apiUrl ?? '';
     fields.model.value = profile?.model ?? '';
     fields.modelOptions.replaceChildren();
-    fields.note.value = profile?.note ?? '';
     fields.key.value = '';
     renderSecrets(profile?.secretId);
 
     const editState = getProfileEditState(profile);
-    for (const field of [fields.name, fields.url, fields.model, fields.note]) field.readOnly = editState.readOnly;
+    for (const field of [fields.name, fields.url, fields.model]) field.readOnly = editState.readOnly;
     fields.secret.disabled = editState.readOnly;
     fields.key.disabled = editState.readOnly;
     fields.fetchModels.disabled = editState.readOnly;
@@ -100,7 +98,7 @@ export async function mountSettingsPanel(app) {
     fields.deleteProfile.disabled = !editState.canDelete;
     fields.copyProfile.disabled = !editState.canCopy;
     fields.source.textContent = profile?.source === PROFILE_SOURCE.NATIVE
-      ? '来源：酒馆现有配置（只读）'
+      ? '来源：酒馆现有配置（保存后同步更新酒馆）'
       : profile ? '来源：桌宠独立配置' : '新建桌宠独立配置';
     if (staleNative) status('所选酒馆配置已不存在，请重新选择', true);
   };
@@ -164,8 +162,8 @@ export async function mountSettingsPanel(app) {
   byId('cp-refresh-presets').addEventListener('click', refreshPresets);
   byId('cp-new-profile').addEventListener('click', () => { editingRef = null; status(''); renderProfiles(); fields.name.focus(); });
   fields.saveProfile.addEventListener('click', async () => {
+    let secretSaved = false;
     try {
-      if (editingRef?.source === PROFILE_SOURCE.NATIVE) throw new Error('酒馆现有配置为只读，请先复制为桌宠配置');
       const name = fields.name.value.trim();
       const apiUrl = fields.url.value.trim();
       const model = fields.model.value.trim();
@@ -175,15 +173,25 @@ export async function mountSettingsPanel(app) {
       if (hasNewKey) {
         secretId = await app.host.createSecret(fields.key.value, name);
         if (!secretId) throw new Error('API Key 写入酒馆 Secrets 失败');
+        secretSaved = true;
       }
-      const profile = { id: editingRef?.id || makeId(), name, apiUrl, model, secretId, note: fields.note.value.trim() };
+      if (editingRef?.source === PROFILE_SOURCE.NATIVE) {
+        await app.updateNativeProfile(editingRef.id, { name, apiUrl, model, secretId });
+        fields.key.value = '';
+        renderProfiles();
+        app.refreshPet();
+        status(`${secretSaved ? '密钥已保存到酒馆 Secrets；' : ''}酒馆连接配置已更新。`);
+        return;
+      }
+
+      const profile = { id: editingRef?.id || makeId(), name, apiUrl, model, secretId };
       const index = app.settings.profiles.findIndex(item => item.id === profile.id);
       if (index >= 0) app.settings.profiles[index] = profile; else app.settings.profiles.push(profile);
       editingRef = { source: PROFILE_SOURCE.LOCAL, id: profile.id };
       fields.key.value = '';
       app.save(); renderProfiles(); app.refreshPet();
-      status(`${hasNewKey ? '密钥已保存到酒馆 Secrets；' : ''}配置已保存。`);
-    } catch (error) { status(error.message, true); }
+      status(`${secretSaved ? '密钥已保存到酒馆 Secrets；' : ''}配置已保存。`);
+    } catch (error) { status(`${secretSaved ? '密钥已保存到酒馆 Secrets；' : ''}${error.message}`, true); }
   });
   fields.copyProfile.addEventListener('click', () => {
     const source = app.resolveProfile(editingRef);
@@ -198,7 +206,6 @@ export async function mountSettingsPanel(app) {
       apiUrl: source.apiUrl,
       model: source.model,
       secretId: source.secretId,
-      note: source.note,
     };
     app.settings.profiles.push(copy);
     editingRef = { source: PROFILE_SOURCE.LOCAL, id: copy.id };
@@ -216,7 +223,6 @@ export async function mountSettingsPanel(app) {
     let secretSaved = false;
     const originalText = fields.fetchModels.textContent;
     try {
-      if (editingRef?.source === PROFILE_SOURCE.NATIVE) throw new Error('酒馆现有配置为只读，请先复制为桌宠配置');
       const apiUrl = fields.url.value.trim();
       if (!apiUrl) throw new Error('请先填写 API 地址');
       fields.fetchModels.disabled = true;
@@ -239,7 +245,7 @@ export async function mountSettingsPanel(app) {
       status(`${secretSaved ? '密钥已保存到酒馆 Secrets；' : ''}${error.message}`, true);
     } finally {
       fields.fetchModels.textContent = originalText;
-      fields.fetchModels.disabled = editingRef?.source === PROFILE_SOURCE.NATIVE;
+      fields.fetchModels.disabled = false;
     }
   });
   byId('cp-reset-position').addEventListener('click', () => { app.settings.pet.x = null; app.settings.pet.y = null; app.save(); app.refreshPet(); status('桌宠位置已重置'); });
