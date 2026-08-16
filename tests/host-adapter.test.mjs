@@ -5,11 +5,12 @@ import { resolveProfileRef } from '../src/profile-catalog.js';
 
 test('applies only Custom Chat Completion fields and rotates the native secret', async () => {
   const calls = [];
+  const statuses = ['no_connection', 'Valid'];
   const host = {
     async run(command) { calls.push(['run', command]); },
     async rotateSecret(key, id) { calls.push(['rotate', key, id]); },
     getSecrets: () => [{ id: 'secret-1', active: true }],
-    getConnectionStatus: () => 'Valid',
+    getConnectionStatus: () => statuses.shift() ?? 'Valid',
   };
   await applyCustomProfile(host, { apiUrl: 'http://127.0.0.1:1234/v1', model: 'local-model', secretId: 'secret-1' });
 
@@ -30,12 +31,13 @@ test('rejects STscript control syntax in profile values', () => {
 
 test('does not execute preset or other native profile fields', async () => {
   const commands = [];
+  const statuses = ['no_connection', 'Valid'];
   const host = {
     run: async command => commands.push(command),
     rotateSecret: async () => {},
     hasSecret: () => true,
     getSecrets: () => [{ id: 's1', active: true }],
-    getConnectionStatus: () => 'Valid',
+    getConnectionStatus: () => statuses.shift() ?? 'Valid',
   };
   await applyCustomProfile(host, {
     apiUrl: 'https://example.test/v1', model: 'demo', secretId: 's1',
@@ -47,6 +49,7 @@ test('does not execute preset or other native profile fields', async () => {
 
 test('resolves and applies a native Custom profile without preset operations', async () => {
   const calls = [];
+  const statuses = ['no_connection', 'Valid'];
   const profile = resolveProfileRef(
     { source: 'native', id: 'native-1' },
     [],
@@ -60,7 +63,7 @@ test('resolves and applies a native Custom profile without preset operations', a
     run: async command => calls.push(['run', command]),
     rotateSecret: async (key, id) => calls.push(['rotate', key, id]),
     getSecrets: () => [{ id: 'secret-1', active: true }],
-    getConnectionStatus: () => 'Valid',
+    getConnectionStatus: () => statuses.shift() ?? 'Valid',
   };
 
   await applyCustomProfile(host, profile);
@@ -101,7 +104,7 @@ test('rejects when Secret rotation resolves without activating the requested Sec
   assert.deepEqual(commands, ['/api-url api=custom connect=false quiet=true "https://example.test/v1"']);
 });
 
-test('rejects when the final connect command resolves but fresh status stays disconnected', async () => {
+test('rejects when the final connect command resolves but status stays disconnected', async () => {
   const host = {
     run: async () => {},
     rotateSecret: async () => {},
@@ -114,11 +117,11 @@ test('rejects when the final connect command resolves but fresh status stays dis
       { apiUrl: 'https://example.test/v1', model: 'demo', secretId: '' },
       { connectionTimeoutMs: 5, connectionPollIntervalMs: 1 },
     ),
-    /Custom API 连接失败或超时/,
+    /Custom API 连接未验证或超时/,
   );
 });
 
-test('does not treat empty or non-string fresh statuses as connected', async () => {
+test('does not treat empty or non-string statuses as connected', async () => {
   for (const status of ['', '   ', null, undefined, false]) {
     const host = {
       run: async () => {},
@@ -131,15 +134,35 @@ test('does not treat empty or non-string fresh statuses as connected', async () 
         { apiUrl: 'https://example.test/v1', model: 'demo', secretId: '' },
         { connectionTimeoutMs: 0, connectionPollIntervalMs: 0 },
       ),
-      /Custom API 连接失败或超时/,
+      /Custom API 连接未验证或超时/,
     );
   }
 });
 
-test('succeeds after the requested Secret becomes active and fresh status connects', async () => {
+test('does not treat Status check bypassed or another non-empty status as verified', async () => {
+  for (const unverifiedStatus of ['Status check bypassed', 'Unexpected status']) {
+    const statuses = ['no_connection'];
+    const host = {
+      run: async () => {},
+      rotateSecret: async () => {},
+      getConnectionStatus: () => statuses.shift() ?? unverifiedStatus,
+    };
+
+    await assert.rejects(
+      () => applyCustomProfile(
+        host,
+        { apiUrl: 'https://example.test/v1', model: 'demo', secretId: '' },
+        { connectionTimeoutMs: 5, connectionPollIntervalMs: 1 },
+      ),
+      /Custom API 连接未验证或超时/,
+    );
+  }
+});
+
+test('succeeds only after this attempt transitions from bypassed to Valid', async () => {
   const calls = [];
   let secretActive = false;
-  const statuses = ['no_connection', 'Valid'];
+  const statuses = ['no_connection', 'Status check bypassed', 'Valid'];
   const host = {
     run: async command => calls.push(['run', command]),
     async rotateSecret(key, id) {
@@ -170,10 +193,28 @@ test('succeeds after the requested Secret becomes active and fresh status connec
     ['secrets', true],
     ['run', '/api quiet=true custom'],
     ['run', '/model quiet=true "demo"'],
-    ['run', '/api-url api=custom connect=true quiet=true "https://example.test/v1"'],
     ['status', 'no_connection'],
+    ['run', '/api-url api=custom connect=true quiet=true "https://example.test/v1"'],
+    ['status', 'Status check bypassed'],
     ['status', 'Valid'],
   ]);
+});
+
+test('does not accept a stale Valid that predates this connection attempt', async () => {
+  const host = {
+    run: async () => {},
+    rotateSecret: async () => {},
+    getConnectionStatus: () => 'Valid',
+  };
+
+  await assert.rejects(
+    () => applyCustomProfile(
+      host,
+      { apiUrl: 'https://example.test/v1', model: 'demo', secretId: '' },
+      { connectionTimeoutMs: 5, connectionPollIntervalMs: 1 },
+    ),
+    /Custom API 连接未验证或超时/,
+  );
 });
 
 test('reads native connection rows defensively', () => {

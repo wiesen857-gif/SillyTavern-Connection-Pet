@@ -1,7 +1,7 @@
 const CUSTOM_SECRET_KEY = 'api_key_custom';
 
 // Version-pinned host contract: SillyTavern 1.16.0 (e3b866b),
-// public/scripts/slash-commands.js and public/scripts/secrets.js.
+// public/scripts/openai.js, public/scripts/slash-commands.js and public/scripts/secrets.js.
 
 export function validateCommandValue(value) {
   const normalized = String(value ?? '').trim();
@@ -17,17 +17,16 @@ export function readNativeConnectionProfiles(context) {
 
 const quoted = value => `"${validateCommandValue(value)}"`;
 
-const isConnectedStatus = status => {
-  const normalized = typeof status === 'string' ? status.trim() : '';
-  return normalized !== '' && normalized !== 'no_connection';
-};
-
-async function waitForConnection(host, { connectionTimeoutMs = 5000, connectionPollIntervalMs = 100 } = {}) {
+async function waitForConnection(host, statusBeforeAttempt, { connectionTimeoutMs = 5000, connectionPollIntervalMs = 100 } = {}) {
+  const verifiedStatus = host.context?.translate?.('Valid') ?? 'Valid';
   const deadline = Date.now() + connectionTimeoutMs;
+  let observedTransition = false;
   while (true) {
-    if (isConnectedStatus(host.getConnectionStatus?.())) return;
+    const status = host.getConnectionStatus?.();
+    observedTransition ||= status !== statusBeforeAttempt;
+    if (observedTransition && status === verifiedStatus) return;
     const remaining = deadline - Date.now();
-    if (remaining <= 0) throw new Error('Custom API 连接失败或超时');
+    if (remaining <= 0) throw new Error('Custom API 连接未验证或超时');
     await new Promise(resolve => setTimeout(resolve, Math.min(connectionPollIntervalMs, remaining)));
   }
 }
@@ -52,8 +51,9 @@ export async function applyCustomProfile(host, profile, waitOptions) {
   }
   await host.run('/api quiet=true custom');
   await host.run(`/model quiet=true ${quoted(model)}`);
+  const statusBeforeAttempt = host.getConnectionStatus?.();
   await host.run(`/api-url api=custom connect=true quiet=true ${quoted(apiUrl)}`);
-  await waitForConnection(host, waitOptions);
+  await waitForConnection(host, statusBeforeAttempt, waitOptions);
 }
 
 export async function createBrowserHost() {

@@ -10,6 +10,7 @@ test('exposes only the tagged-reference profile application entry', async () => 
   assert.equal(typeof indexModule.createApp, 'function');
 
   const calls = [];
+  const statuses = ['no_connection', 'Valid'];
   const host = {
     getNativeConnectionProfiles: () => [{
       id: 'native-1',
@@ -24,7 +25,7 @@ test('exposes only the tagged-reference profile application entry', async () => 
     run: async command => calls.push(['run', command]),
     rotateSecret: async (key, id) => calls.push(['rotate', key, id]),
     getSecrets: () => [{ id: 'secret-1', active: true }],
-    getConnectionStatus: () => 'Valid',
+    getConnectionStatus: () => statuses.shift() ?? 'Valid',
   };
   const app = indexModule.createApp(host, { profiles: [] }, () => {}, () => {});
 
