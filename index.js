@@ -5,6 +5,25 @@ import { requireTavernHelper } from './src/preset-operations.js';
 import { mountSettingsPanel } from './src/settings-panel.js';
 import { mountPetWidget } from './src/pet-widget.js';
 
+export function createApp(host, settings, save, refreshPet) {
+  const getNativeProfiles = () => host.getNativeConnectionProfiles();
+  return {
+    host,
+    settings,
+    save,
+    getProfileCatalog: () => listProfileCatalog(settings.profiles, getNativeProfiles()),
+    resolveProfile: ref => resolveProfileRef(ref, settings.profiles, getNativeProfiles()),
+    applyProfile: profile => applyCustomProfile(host, profile),
+    async applyProfileRef(ref) {
+      const profile = this.resolveProfile(ref);
+      if (!profile) throw new Error('所选 API 配置已不存在，请重新选择');
+      await applyCustomProfile(host, profile);
+      return profile;
+    },
+    refreshPet,
+  };
+}
+
 async function initialize() {
   try {
     const host = await createBrowserHost();
@@ -13,21 +32,7 @@ async function initialize() {
     host.context.extensionSettings[SETTINGS_KEY] = settings;
     let petWidget;
     const save = () => host.context.saveSettingsDebounced();
-    const getNativeProfiles = () => host.getNativeConnectionProfiles();
-    const app = {
-      host,
-      settings,
-      save,
-      getProfileCatalog: () => listProfileCatalog(settings.profiles, getNativeProfiles()),
-      resolveProfile: ref => resolveProfileRef(ref, settings.profiles, getNativeProfiles()),
-      async applyProfileRef(ref) {
-        const profile = this.resolveProfile(ref);
-        if (!profile) throw new Error('所选 API 配置已不存在，请重新选择');
-        await applyCustomProfile(host, profile);
-        return profile;
-      },
-      refreshPet: () => petWidget?.refresh(),
-    };
+    const app = createApp(host, settings, save, () => petWidget?.refresh());
     petWidget = mountPetWidget(app);
     await mountSettingsPanel(app);
     save();
