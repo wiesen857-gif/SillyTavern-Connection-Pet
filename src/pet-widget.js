@@ -23,8 +23,15 @@ export function renderProfileSummary(summary, app, selectedValue) {
   source.className = 'cp-source-badge';
   source.textContent = profile.source === PROFILE_SOURCE.NATIVE ? '来源：酒馆现有配置' : '来源：桌宠独立配置';
   const details = document.createElement('div');
-  details.textContent = `模型：${profile.model}\nURL：${profile.apiUrl}`;
-  summary.replaceChildren(source, details);
+  details.textContent = `模型：${profile.model || '（未填写）'}\nURL：${profile.apiUrl || '（未填写）'}`;
+  const children = [source, details];
+  if (!profile.apiUrl || !profile.model) {
+    const warning = document.createElement('div');
+    warning.className = 'cp-inline-warning';
+    warning.textContent = '请先在扩展设置中补全 API 地址和模型';
+    children.push(warning);
+  }
+  summary.replaceChildren(...children);
 }
 
 export function buildEnabledEntryRequest(allowed, checkedIds) {

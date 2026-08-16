@@ -18,6 +18,7 @@
 .cp-grid .cp-wide { grid-column: 1 / -1; }
 .cp-field-action { display: flex; flex-wrap: wrap; gap: 6px; }
 .cp-field-action .text_pole { flex: 1 1 150px; min-width: 0; }
+.cp-field-action .cp-model-select { flex-basis: 100%; }
 .cp-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
 .connection-pet-settings .menu_button,
 .cp-popover .menu_button {
@@ -38,6 +39,7 @@
 .cp-status { min-height: 1.4em; margin-top: 8px; color: #b9dfbd; font-size: .88em; }
 .cp-status.is-error { color: #f1a8b0; }
 .cp-source-badge { opacity: .72; font-size: .82em; }
+.cp-inline-warning { margin-top: 4px; color: #f1a8b0; }
 .cp-grid :disabled { opacity: .72; cursor: not-allowed; }
 
 #connection-pet-root { position: fixed; left: var(--cp-x); top: var(--cp-y); z-index: 32000; width: var(--cp-size); height: var(--cp-size); touch-action: none; }

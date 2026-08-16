@@ -66,3 +66,21 @@ test('builds a one-click preset request from checked allowlisted entries only', 
   assert.deepEqual([...request.states], [['adult', true]]);
   assert.deepEqual([...request.allowedIds], ['adult', 'style']);
 });
+
+test('profile summary explicitly marks missing API fields', () => {
+  const originalDocument = globalThis.document;
+  globalThis.document = { createElement: makeElement };
+  try {
+    const summary = makeElement('div');
+    const app = { resolveProfile: () => ({ source: 'native', model: '', apiUrl: '' }) };
+
+    petWidget.renderProfileSummary(summary, app, 'native:incomplete');
+
+    assert.match(summary.children[1].textContent, /模型：\（未填写\）/);
+    assert.match(summary.children[1].textContent, /URL：\（未填写\）/);
+    assert.equal(summary.children[2].className, 'cp-inline-warning');
+    assert.match(summary.children[2].textContent, /补全 API 地址和模型/);
+  } finally {
+    globalThis.document = originalDocument;
+  }
+});

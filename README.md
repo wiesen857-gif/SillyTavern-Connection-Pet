@@ -21,7 +21,7 @@
 
 ### 保存 API 配置
 
-填写配置名称和 API 地址后，可以手动填写模型 ID，也可以点击“获取模型”从接口读取模型列表并下拉选择。可以选择已有的 Custom Secret，也可以临时输入新的 API Key；获取模型或保存配置时，新 Key 只会写入 SillyTavern 原生 Secrets，界面会明确提示“密钥已保存到酒馆 Secrets”。扩展设置仅保存 Secret ID，不保存明文 Key。
+填写配置名称和 API 地址后，可以手动填写模型 ID，也可以点击“获取模型”，再从独立的完整模型下拉列表中选择。API 地址或模型为空时，扩展设置和桌宠都会明确提示补全。可以选择已有的 Custom Secret，也可以临时输入新的 API Key；获取模型或保存配置时，新 Key 只会写入 SillyTavern 原生 Secrets，界面会明确提示“密钥已保存到酒馆 Secrets”。扩展设置仅保存 Secret ID，不保存明文 Key。
 
 扩展设置页只负责管理配置，不会改变当前连接。请在桌宠的“API 配置”页选择配置并点击“一键应用”；它只会设置 Custom API 地址、Custom 模型和对应 Secret ID，然后发起连接，不会加载任何提示词预设。
 

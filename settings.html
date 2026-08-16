@@ -15,9 +15,9 @@
         <label>配置名称<input id="cp-profile-name" class="text_pole" autocomplete="off"></label>
         <label>模型 ID
           <div class="cp-field-action">
-            <input id="cp-profile-model" class="text_pole" list="cp-model-options" autocomplete="off">
-            <datalist id="cp-model-options"></datalist>
+            <input id="cp-profile-model" class="text_pole" autocomplete="off" placeholder="可手动填写模型 ID">
             <button id="cp-fetch-models" type="button" class="menu_button">获取模型</button>
+            <select id="cp-model-select" class="text_pole cp-model-select" aria-label="获取到的模型" hidden></select>
           </div>
         </label>
         <label class="cp-wide">API 地址<input id="cp-profile-url" class="text_pole" placeholder="http://127.0.0.1:1234/v1" autocomplete="off"></label>

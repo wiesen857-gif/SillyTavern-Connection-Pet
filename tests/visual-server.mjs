@@ -11,7 +11,13 @@ const server = createServer(async (request, response) => {
   }
   if (request.url === '/api/backends/chat-completions/status' && request.method === 'POST') {
     response.setHeader('Content-Type', 'application/json');
-    return response.end(JSON.stringify({ data: [{ id: 'demo-model' }, { id: 'another-model' }] }));
+    return response.end(JSON.stringify({ data: [
+      { id: '【k-个人】claude-opus-4-6' },
+      { id: '【k-个人】claude-opus-4-6-thinking' },
+      { id: '【满血】gemini-3.5-flash' },
+      { id: '【企业CLI】gemini-3.1-pro-preview' },
+      { id: 'another-model' },
+    ] }));
   }
   const relative = request.url === '/' ? 'tests/fixtures/mock-host.html' : decodeURIComponent(request.url.split('?')[0]).replace(/^\//, '');
   const file = normalize(join(root, relative));

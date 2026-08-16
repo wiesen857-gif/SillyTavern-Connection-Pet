@@ -44,7 +44,7 @@ export async function mountSettingsPanel(app) {
 
   const fields = {
     enabled: byId('cp-enabled'), profiles: byId('cp-profile-select'), name: byId('cp-profile-name'),
-    url: byId('cp-profile-url'), model: byId('cp-profile-model'), modelOptions: byId('cp-model-options'),
+    url: byId('cp-profile-url'), model: byId('cp-profile-model'), modelSelect: byId('cp-model-select'),
     fetchModels: byId('cp-fetch-models'), secret: byId('cp-profile-secret'),
     key: byId('cp-profile-key'), source: byId('cp-profile-source'),
     preset: byId('cp-preset-select'),
@@ -85,7 +85,8 @@ export async function mountSettingsPanel(app) {
     fields.name.value = profile?.name ?? '';
     fields.url.value = profile?.apiUrl ?? '';
     fields.model.value = profile?.model ?? '';
-    fields.modelOptions.replaceChildren();
+    fields.modelSelect.replaceChildren(option('', '获取模型后在此选择…'));
+    fields.modelSelect.hidden = true;
     fields.key.value = '';
     renderSecrets(profile?.secretId);
 
@@ -101,6 +102,7 @@ export async function mountSettingsPanel(app) {
       ? '来源：酒馆现有配置（保存后同步更新酒馆）'
       : profile ? '来源：桌宠独立配置' : '新建桌宠独立配置';
     if (staleNative) status('所选酒馆配置已不存在，请重新选择', true);
+    else if (profile && (!profile.apiUrl || !profile.model)) status('此配置缺少 API 地址或模型，请补全后保存。', true);
   };
   const renderPrompts = () => {
     fields.prompts.replaceChildren();
@@ -158,6 +160,9 @@ export async function mountSettingsPanel(app) {
   fields.enabled.checked = app.settings.enabled;
   fields.enabled.addEventListener('change', () => { app.settings.enabled = fields.enabled.checked; app.save(); app.refreshPet(); });
   fields.profiles.addEventListener('change', () => { editingRef = decodeProfileRef(fields.profiles.value); status(''); renderProfiles(); });
+  fields.modelSelect.addEventListener('change', () => {
+    if (fields.modelSelect.value) fields.model.value = fields.modelSelect.value;
+  });
   fields.preset.addEventListener('change', renderPrompts);
   byId('cp-refresh-presets').addEventListener('click', refreshPresets);
   byId('cp-new-profile').addEventListener('click', () => { editingRef = null; status(''); renderProfiles(); fields.name.focus(); });
@@ -238,8 +243,10 @@ export async function mountSettingsPanel(app) {
       }
 
       const models = await app.fetchModels({ apiUrl, secretId });
-      fields.modelOptions.replaceChildren(...models.map(model => option(model, model)));
+      fields.modelSelect.replaceChildren(option('', `选择模型（共 ${models.length} 个）…`), ...models.map(model => option(model, model)));
+      fields.modelSelect.hidden = false;
       if (!fields.model.value.trim()) fields.model.value = models[0];
+      fields.modelSelect.value = models.includes(fields.model.value.trim()) ? fields.model.value.trim() : '';
       status(`${secretSaved ? '密钥已保存到酒馆 Secrets；' : ''}已获取 ${models.length} 个模型。`);
     } catch (error) {
       status(`${secretSaved ? '密钥已保存到酒馆 Secrets；' : ''}${error.message}`, true);
