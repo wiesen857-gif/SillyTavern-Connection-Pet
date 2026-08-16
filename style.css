@@ -16,7 +16,19 @@
 .cp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; margin-top: 9px; }
 .cp-grid label, .cp-tab-panel label { display: grid; gap: 4px; font-size: .88em; }
 .cp-grid .cp-wide { grid-column: 1 / -1; }
+.cp-field-action { display: flex; flex-wrap: wrap; gap: 6px; }
+.cp-field-action .text_pole { flex: 1 1 150px; min-width: 0; }
 .cp-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
+.connection-pet-settings .menu_button,
+.cp-popover .menu_button {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  writing-mode: horizontal-tb !important;
+  white-space: nowrap !important;
+  word-break: keep-all;
+}
+.cp-actions .menu_button { flex: 1 0 110px; min-width: max-content; }
 .cp-primary { background: var(--cp-mauve) !important; color: #fff !important; border-color: var(--cp-pink-strong) !important; }
 .cp-danger { color: #efb5bb !important; }
 .cp-prompt-list { display: grid; gap: 5px; max-height: 250px; margin-top: 9px; overflow: auto; }
@@ -44,15 +56,12 @@
 .cp-tabs button { padding: 7px; border: 0; border-radius: 8px; color: #d7c6cf; background: transparent; cursor: pointer; }
 .cp-tabs button.is-active { color: var(--cp-ink); background: var(--cp-pink); font-weight: 700; }
 .cp-tab-panel { display: grid; gap: 9px; }
+.cp-pet-apply, .cp-pet-preset-apply { width: 100%; }
 .cp-profile-summary { min-height: 48px; padding: 8px; border-radius: 9px; background: rgba(255,255,255,.045); white-space: pre-line; word-break: break-all; font-size: .84em; opacity: .82; }
 .cp-empty { margin: 8px 0; text-align: center; opacity: .65; }
 
 @media (max-width: 600px) {
   .cp-grid { grid-template-columns: 1fr; }
   .cp-grid .cp-wide { grid-column: auto; }
-  .connection-pet-settings .cp-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .connection-pet-settings .cp-actions .menu_button { width: 100%; min-width: 0; white-space: normal; }
-  .connection-pet-settings .cp-actions .cp-apply-wide { grid-column: 1 / -1; }
-  .cp-pet-apply { width: 100%; }
   .cp-popover { position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; max-height: 72vh; overflow: auto; }
 }

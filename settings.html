@@ -13,7 +13,13 @@
       <p id="cp-profile-source" class="cp-hint"></p>
       <div class="cp-grid">
         <label>配置名称<input id="cp-profile-name" class="text_pole" autocomplete="off"></label>
-        <label>模型 ID<input id="cp-profile-model" class="text_pole" autocomplete="off"></label>
+        <label>模型 ID
+          <div class="cp-field-action">
+            <input id="cp-profile-model" class="text_pole" list="cp-model-options" autocomplete="off">
+            <datalist id="cp-model-options"></datalist>
+            <button id="cp-fetch-models" type="button" class="menu_button">获取模型</button>
+          </div>
+        </label>
         <label class="cp-wide">API 地址<input id="cp-profile-url" class="text_pole" placeholder="http://127.0.0.1:1234/v1" autocomplete="off"></label>
         <label>已有 Secret<select id="cp-profile-secret" class="text_pole"></select></label>
         <label>新 API Key（可选）<input id="cp-profile-key" class="text_pole" type="password" autocomplete="new-password" placeholder="仅写入酒馆原生 Secrets"></label>
@@ -23,7 +29,6 @@
         <button id="cp-save-profile" class="menu_button">保存配置</button>
         <button id="cp-copy-profile" class="menu_button">复制</button>
         <button id="cp-delete-profile" class="menu_button cp-danger">删除</button>
-        <button id="cp-apply-profile" class="menu_button cp-primary cp-apply-wide">立即应用</button>
       </div>
       <p class="cp-hint">删除配置不会删除酒馆 Secrets 中的密钥。</p>
     </section>

@@ -27,6 +27,15 @@ export function renderProfileSummary(summary, app, selectedValue) {
   summary.replaceChildren(source, details);
 }
 
+export function buildEnabledEntryRequest(allowed, checkedIds) {
+  const allowedIds = new Set(allowed.map(item => String(item.promptId)));
+  const checked = new Set([...checkedIds].map(String));
+  return {
+    states: new Map([...allowedIds].filter(id => checked.has(id)).map(id => [id, true])),
+    allowedIds,
+  };
+}
+
 export function mountPetWidget(app) {
   const root = document.createElement('div');
   root.id = 'connection-pet-root';
@@ -48,6 +57,7 @@ export function mountPetWidget(app) {
       <div class="cp-tab-panel" data-panel="preset" hidden>
         <label>先切换到预设<select class="text_pole cp-pet-presets"></select></label>
         <div class="cp-pet-prompts cp-prompt-list"></div>
+        <button class="menu_button cp-primary cp-pet-preset-apply">一键应用</button>
       </div>
       <div class="cp-pet-status cp-status" role="status"></div>
     </div>`;
@@ -59,6 +69,7 @@ export function mountPetWidget(app) {
   const promptList = root.querySelector('.cp-pet-prompts');
   const status = root.querySelector('.cp-pet-status');
   const summary = root.querySelector('.cp-profile-summary');
+  const presetApply = root.querySelector('.cp-pet-preset-apply');
   let dragged = false;
 
   const showStatus = (message, error = false) => { status.textContent = message; status.classList.toggle('is-error', error); };
@@ -78,26 +89,21 @@ export function mountPetWidget(app) {
   const renderPrompts = () => {
     promptList.replaceChildren();
     const presetName = presetSelect.value;
+    presetApply.disabled = !presetName;
     if (!presetName) return;
     try {
       const allowed = app.settings.presetAllowlist[presetName] ?? [];
       const prompts = new Map(listPresetPrompts(app.host.helper, presetName).map(item => [item.id, item]));
       if (!allowed.length) {
+        presetApply.disabled = true;
         const empty = document.createElement('p'); empty.className = 'cp-empty'; empty.textContent = '此预设还没有待开启条目'; promptList.append(empty); return;
       }
       for (const item of allowed) {
         const prompt = prompts.get(item.promptId);
         const label = document.createElement('label'); label.className = `cp-prompt-row${prompt ? '' : ' is-stale'}`;
         const input = Object.assign(document.createElement('input'), { type: 'checkbox', checked: Boolean(prompt?.enabled), disabled: !prompt });
+        if (prompt) input.dataset.promptId = item.promptId;
         const name = document.createElement('span'); name.textContent = prompt?.name ?? `${item.lastKnownName}（已失效）`;
-        input.addEventListener('change', async () => {
-          input.disabled = true;
-          try {
-            await switchPresetAndSetEntries(app.host.helper, presetName, new Map([[item.promptId, input.checked]]), new Set(allowed.map(row => row.promptId)));
-            showStatus(`已切换到“${presetName}”并${input.checked ? '开启' : '关闭'}“${name.textContent}”`);
-            renderPrompts();
-          } catch (error) { input.checked = !input.checked; input.disabled = false; showStatus(error.message, true); }
-        });
         label.append(input, name); promptList.append(label);
       }
     } catch (error) { showStatus(error.message, true); }
@@ -152,6 +158,29 @@ export function mountPetWidget(app) {
       showStatus(`已应用：${profile.name}`);
     } catch (error) {
       showStatus(error.message, true);
+    }
+  });
+  presetApply.addEventListener('click', async () => {
+    const presetName = presetSelect.value;
+    if (!presetName) return showStatus('请先选择预设', true);
+    const allowed = app.settings.presetAllowlist[presetName] ?? [];
+    const checkedIds = [...promptList.querySelectorAll('input[data-prompt-id]:checked')]
+      .map(input => input.dataset.promptId);
+    const request = buildEnabledEntryRequest(allowed, checkedIds);
+    if (!request.states.size) return showStatus('请至少勾选一个待开启条目', true);
+
+    const originalText = presetApply.textContent;
+    presetApply.disabled = true;
+    presetApply.textContent = '应用中…';
+    try {
+      await switchPresetAndSetEntries(app.host.helper, presetName, request.states, request.allowedIds);
+      showStatus(`已应用预设“${presetName}”并开启 ${request.states.size} 个条目`);
+      renderPrompts();
+    } catch (error) {
+      showStatus(error.message, true);
+    } finally {
+      presetApply.textContent = originalText;
+      presetApply.disabled = false;
     }
   });
   window.addEventListener('resize', clampPosition);

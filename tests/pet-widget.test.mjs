@@ -53,3 +53,16 @@ test('resolves a tagged selection and renders its source, model, and URL', () =>
     globalThis.document = originalDocument;
   }
 });
+
+test('builds a one-click preset request from checked allowlisted entries only', () => {
+  assert.equal(typeof petWidget.buildEnabledEntryRequest, 'function');
+  const allowed = [
+    { promptId: 'adult', lastKnownName: '一键开启瑟瑟' },
+    { promptId: 'style', lastKnownName: '文风增强' },
+  ];
+
+  const request = petWidget.buildEnabledEntryRequest(allowed, ['adult', 'not-allowed']);
+
+  assert.deepEqual([...request.states], [['adult', true]]);
+  assert.deepEqual([...request.allowedIds], ['adult', 'style']);
+});

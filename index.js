@@ -1,4 +1,4 @@
-import { applyCustomProfile, createBrowserHost } from './src/host-adapter.js';
+import { applyCustomProfile, createBrowserHost, fetchCustomModels } from './src/host-adapter.js';
 import { listProfileCatalog, resolveProfileRef } from './src/profile-catalog.js';
 import { normalizeSettings, SETTINGS_KEY } from './src/settings.js';
 import { requireTavernHelper } from './src/preset-operations.js';
@@ -19,6 +19,7 @@ export function createApp(host, settings, save, refreshPet) {
       await applyCustomProfile(host, profile);
       return profile;
     },
+    fetchModels: request => fetchCustomModels(host, request),
     refreshPet,
   };
 }

@@ -10,6 +10,14 @@ export function validateCommandValue(value) {
   return normalized;
 }
 
+function validateApiUrl(value) {
+  const apiUrl = validateCommandValue(value);
+  let parsed;
+  try { parsed = new URL(apiUrl); } catch { throw new Error('API 地址不是有效 URL'); }
+  if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('API 地址仅支持 http 或 https');
+  return apiUrl;
+}
+
 export function readNativeConnectionProfiles(context) {
   const rows = context.extensionSettings?.connectionManager?.profiles;
   return Array.isArray(rows) ? [...rows] : [];
@@ -32,12 +40,9 @@ async function waitForConnection(host, statusBeforeAttempt, { connectionTimeoutM
 }
 
 export async function applyCustomProfile(host, profile, waitOptions) {
-  const apiUrl = validateCommandValue(profile?.apiUrl);
+  const apiUrl = validateApiUrl(profile?.apiUrl);
   const model = validateCommandValue(profile?.model);
   const secretId = profile?.secretId ? validateCommandValue(profile.secretId) : '';
-  let parsed;
-  try { parsed = new URL(apiUrl); } catch { throw new Error('API 地址不是有效 URL'); }
-  if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('API 地址仅支持 http 或 https');
 
   if (secretId && typeof host.hasSecret === 'function' && !host.hasSecret(secretId)) {
     throw new Error('配置引用的酒馆 Secret 已不存在或不可用');
@@ -54,6 +59,41 @@ export async function applyCustomProfile(host, profile, waitOptions) {
   const statusBeforeAttempt = host.getConnectionStatus?.();
   await host.run(`/api-url api=custom connect=true quiet=true ${quoted(apiUrl)}`);
   await waitForConnection(host, statusBeforeAttempt, waitOptions);
+}
+
+export async function fetchCustomModels(host, request) {
+  const apiUrl = validateApiUrl(request?.apiUrl);
+  const secretId = request?.secretId ? validateCommandValue(request.secretId) : '';
+  const secretsBefore = host.getSecrets();
+  const previousActive = secretsBefore.find(row => row.active === true);
+  const needsRotation = Boolean(secretId && previousActive?.id !== secretId);
+
+  if (secretId && !secretsBefore.some(row => row.id === secretId)) {
+    throw new Error('配置引用的酒馆 Secret 已不存在或不可用');
+  }
+
+  try {
+    if (needsRotation) {
+      await host.rotateSecret(CUSTOM_SECRET_KEY, secretId);
+      if (!host.getSecrets().some(row => row.id === secretId && row.active === true)) {
+        throw new Error('配置引用的酒馆 Secret 未能激活');
+      }
+    }
+
+    const rows = await host.requestCustomModels(apiUrl);
+    const models = [...new Set((Array.isArray(rows) ? rows : [])
+      .map(row => typeof row?.id === 'string' ? row.id.trim() : '')
+      .filter(Boolean))].sort((left, right) => left.localeCompare(right));
+    if (!models.length) throw new Error('未获取到可用模型，可手动填写模型 ID');
+    return models;
+  } finally {
+    if (needsRotation && previousActive?.id) {
+      await host.rotateSecret(CUSTOM_SECRET_KEY, previousActive.id);
+      if (!host.getSecrets().some(row => row.id === previousActive.id && row.active === true)) {
+        throw new Error('获取模型后未能恢复原有酒馆 Secret');
+      }
+    }
+  }
 }
 
 export async function createBrowserHost() {
@@ -80,6 +120,24 @@ export async function createBrowserHost() {
     getSecrets,
     hasSecret: id => getSecrets().some(row => row.id === id),
     getConnectionStatus: () => globalThis.SillyTavern?.getContext?.()?.onlineStatus,
+    async requestCustomModels(apiUrl) {
+      // SillyTavern 1.16.0, src/endpoints/backends/chat-completions.js:
+      // POST /api/backends/chat-completions/status proxies Custom /models requests.
+      const response = await fetch('/api/backends/chat-completions/status', {
+        method: 'POST',
+        headers: context.getRequestHeaders(),
+        body: JSON.stringify({
+          chat_completion_source: 'custom',
+          custom_url: apiUrl,
+          custom_include_headers: '',
+        }),
+        cache: 'no-cache',
+      });
+      if (!response.ok) throw new Error(`获取模型失败：HTTP ${response.status}`);
+      const body = await response.json();
+      if (body?.error || !Array.isArray(body?.data)) throw new Error('接口未返回可用模型列表');
+      return body.data;
+    },
     getNativeConnectionProfiles: () => readNativeConnectionProfiles(context),
   };
 }

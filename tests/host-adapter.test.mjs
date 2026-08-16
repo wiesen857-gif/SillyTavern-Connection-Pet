@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyCustomProfile, readNativeConnectionProfiles, validateCommandValue } from '../src/host-adapter.js';
+import { applyCustomProfile, fetchCustomModels, readNativeConnectionProfiles, validateCommandValue } from '../src/host-adapter.js';
 import { resolveProfileRef } from '../src/profile-catalog.js';
 
 test('applies only Custom Chat Completion fields and rotates the native secret', async () => {
@@ -223,4 +223,60 @@ test('reads native connection rows defensively', () => {
   assert.deepEqual(rows, original);
   assert.notEqual(rows, original);
   assert.deepEqual(readNativeConnectionProfiles({ extensionSettings: {} }), []);
+});
+
+test('fetches sorted unique Custom models with the selected Secret and restores the prior Secret', async () => {
+  let activeId = 'old-secret';
+  const calls = [];
+  const host = {
+    getSecrets: () => [
+      { id: 'old-secret', active: activeId === 'old-secret' },
+      { id: 'new-secret', active: activeId === 'new-secret' },
+    ],
+    async rotateSecret(key, id) { calls.push(['rotate', key, id]); activeId = id; },
+    async requestCustomModels(apiUrl) {
+      calls.push(['models', apiUrl, activeId]);
+      return [{ id: 'z-model' }, { id: 'a-model' }, { id: 'z-model' }, { name: 'ignored' }];
+    },
+  };
+
+  const models = await fetchCustomModels(host, { apiUrl: 'https://example.test/v1', secretId: 'new-secret' });
+
+  assert.deepEqual(models, ['a-model', 'z-model']);
+  assert.deepEqual(calls, [
+    ['rotate', 'api_key_custom', 'new-secret'],
+    ['models', 'https://example.test/v1', 'new-secret'],
+    ['rotate', 'api_key_custom', 'old-secret'],
+  ]);
+  assert.equal(activeId, 'old-secret');
+});
+
+test('restores the prior Secret when model retrieval fails', async () => {
+  let activeId = 'old-secret';
+  const host = {
+    getSecrets: () => [
+      { id: 'old-secret', active: activeId === 'old-secret' },
+      { id: 'new-secret', active: activeId === 'new-secret' },
+    ],
+    async rotateSecret(_key, id) { activeId = id; },
+    async requestCustomModels() { throw new Error('模型接口不可用'); },
+  };
+
+  await assert.rejects(
+    () => fetchCustomModels(host, { apiUrl: 'https://example.test/v1', secretId: 'new-secret' }),
+    /模型接口不可用/,
+  );
+  assert.equal(activeId, 'old-secret');
+});
+
+test('rejects an empty Custom model list with a manual-entry hint', async () => {
+  const host = {
+    getSecrets: () => [],
+    requestCustomModels: async () => [],
+  };
+
+  await assert.rejects(
+    () => fetchCustomModels(host, { apiUrl: 'https://example.test/v1', secretId: '' }),
+    /未获取到可用模型.*手动填写模型 ID/,
+  );
 });
