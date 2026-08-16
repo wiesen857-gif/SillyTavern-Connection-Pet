@@ -12,13 +12,13 @@ const nativeRows = [
   { id: 'same', name: '酒馆 Custom', mode: 'cc', api: 'custom', 'api-url': 'https://example.test/v1', model: 'native-model', 'secret-id': 'secret-1', preset: '不得应用', proxy: '也不得应用' },
   { id: 'openrouter', name: '独立 OpenRouter', mode: 'cc', api: 'openrouter', 'api-url': 'https://openrouter.ai/api/v1', model: 'x' },
   { id: 'text', name: 'Text Completion', mode: 'tc', api: 'custom', 'api-url': 'https://example.test/v1', model: 'x' },
-  { id: 'empty-model', name: '缺模型', mode: 'cc', api: 'custom', 'api-url': 'https://example.test/v1', model: '' },
+  { id: 'empty-model', name: '哈基米', mode: 'cc', api: 'custom', 'api-url': 'https://example.test/v1', model: '' },
 ];
 const localRows = [{ id: 'same', name: '桌宠配置', apiUrl: 'http://127.0.0.1:1234/v1', model: 'local-model', secretId: '' }];
 
-test('catalog keeps only valid cc/custom native rows and strips unrelated fields', () => {
+test('catalog keeps every cc/custom native row even when editable fields are incomplete', () => {
   const catalog = listProfileCatalog(localRows, nativeRows);
-  assert.equal(catalog.native.length, 1);
+  assert.equal(catalog.native.length, 2);
   assert.deepEqual(catalog.native[0], {
     source: PROFILE_SOURCE.NATIVE,
     id: 'same',
@@ -29,6 +29,14 @@ test('catalog keeps only valid cc/custom native rows and strips unrelated fields
   });
   assert.equal('preset' in catalog.native[0], false);
   assert.equal('proxy' in catalog.native[0], false);
+  assert.deepEqual(catalog.native[1], {
+    source: PROFILE_SOURCE.NATIVE,
+    id: 'empty-model',
+    name: '哈基米',
+    apiUrl: 'https://example.test/v1',
+    model: '',
+    secretId: '',
+  });
 });
 
 test('tagged references distinguish equal IDs from different sources', () => {

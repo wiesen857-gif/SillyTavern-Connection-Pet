@@ -35,7 +35,7 @@ function normalizeNative(row) {
   const id = text(row.id);
   const apiUrl = text(row['api-url']);
   const model = text(row.model);
-  if (!id || !apiUrl || !model) return null;
+  if (!id) return null;
   return {
     source: PROFILE_SOURCE.NATIVE,
     id,
