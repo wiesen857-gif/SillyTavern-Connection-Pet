@@ -9,6 +9,7 @@
 - 仅支持 `Chat Completion → Custom (OpenAI-compatible)`
 - 不操作 OpenRouter、DeepSeek 等独立供应商入口；这些服务仍可通过兼容地址接入
 - API 配置与提示词预设完全解耦，切换 API 配置不会切换预设或修改条目
+- 初始化时会等待酒馆助手 4.9.2 完成接口加载；超过 10 秒仍不可用才显示错误
 
 ## 安装
 

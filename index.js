@@ -1,7 +1,7 @@
 import { applyCustomProfile, createBrowserHost, fetchCustomModels, updateNativeConnectionProfile } from './src/host-adapter.js';
 import { listProfileCatalog, resolveProfileRef } from './src/profile-catalog.js';
 import { normalizeSettings, SETTINGS_KEY } from './src/settings.js';
-import { requireTavernHelper } from './src/preset-operations.js';
+import { waitForTavernHelper } from './src/preset-operations.js';
 import { mountSettingsPanel } from './src/settings-panel.js';
 import { mountPetWidget } from './src/pet-widget.js';
 
@@ -28,7 +28,7 @@ export function createApp(host, settings, save, refreshPet) {
 async function initialize() {
   try {
     const host = await createBrowserHost();
-    requireTavernHelper(host.helper);
+    host.helper = await waitForTavernHelper();
     const settings = normalizeSettings(host.context.extensionSettings[SETTINGS_KEY]);
     host.context.extensionSettings[SETTINGS_KEY] = settings;
     let petWidget;

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { switchPresetAndSetEntries } from '../src/preset-operations.js';
+import { switchPresetAndSetEntries, waitForTavernHelper } from '../src/preset-operations.js';
 
 function fakeHelper() {
   const calls = [];
@@ -37,4 +37,26 @@ test('rejects non-allowlisted and stale IDs before switching preset', async () =
     await assert.rejects(() => switchPresetAndSetEntries(helper, 'Demo', states, allowlist));
     assert.equal(helper.calls.some(call => call[0] === 'load'), false);
   }
+});
+
+test('waits for Tavern Helper 4.9.2 to finish exposing its preset API', async () => {
+  const helper = {
+    getPresetNames() {}, getLoadedPresetName() {}, getPreset() {}, loadPreset() {}, replacePreset() {},
+  };
+  let probes = 0;
+
+  const result = await waitForTavernHelper(
+    () => ++probes >= 3 ? helper : undefined,
+    { timeoutMs: 50, pollIntervalMs: 1 },
+  );
+
+  assert.equal(result, helper);
+  assert.equal(probes, 3);
+});
+
+test('reports the missing Tavern Helper preset API after the readiness timeout', async () => {
+  await assert.rejects(
+    () => waitForTavernHelper(() => ({ getPresetNames() {} }), { timeoutMs: 1, pollIntervalMs: 1 }),
+    /酒馆助手接口不可用.*getLoadedPresetName.*getPreset.*loadPreset.*replacePreset/,
+  );
 });

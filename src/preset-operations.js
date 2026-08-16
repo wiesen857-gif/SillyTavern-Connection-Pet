@@ -1,9 +1,27 @@
 // Version-pinned helper contract: Tavern Helper 4.9.2 (9706d0b),
 // @types/function/preset.d.ts.
-export function requireTavernHelper(helper, methods = ['getPresetNames', 'getLoadedPresetName', 'getPreset', 'loadPreset', 'replacePreset']) {
+const PRESET_METHODS = ['getPresetNames', 'getLoadedPresetName', 'getPreset', 'loadPreset', 'replacePreset'];
+
+export function requireTavernHelper(helper, methods = PRESET_METHODS) {
   const missing = methods.filter(name => typeof helper?.[name] !== 'function');
   if (missing.length) throw new Error(`酒馆助手接口不可用：${missing.join('、')}`);
   return helper;
+}
+
+export async function waitForTavernHelper(
+  getHelper = () => globalThis.TavernHelper,
+  { timeoutMs = 10000, pollIntervalMs = 50 } = {},
+) {
+  const deadline = Date.now() + timeoutMs;
+  while (true) {
+    const helper = getHelper();
+    try {
+      return requireTavernHelper(helper);
+    } catch (error) {
+      if (Date.now() >= deadline) throw error;
+      await new Promise(resolve => setTimeout(resolve, Math.min(pollIntervalMs, Math.max(0, deadline - Date.now()))));
+    }
+  }
 }
 
 export function listPresetPrompts(helper, presetName) {
