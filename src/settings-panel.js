@@ -1,8 +1,35 @@
 import { makeId } from './settings.js';
+import { decodeProfileRef, encodeProfileRef, PROFILE_SOURCE } from './profile-catalog.js';
 import { listPresetPrompts, requireTavernHelper } from './preset-operations.js';
 
 const byId = id => document.getElementById(id);
 const option = (value, label) => Object.assign(document.createElement('option'), { value, textContent: label });
+
+export function makeProfileGroups(catalog) {
+  return [
+    { source: PROFILE_SOURCE.NATIVE, label: '酒馆现有配置' },
+    { source: PROFILE_SOURCE.LOCAL, label: '桌宠独立配置' },
+  ].flatMap(group => {
+    const options = (Array.isArray(catalog?.[group.source]) ? catalog[group.source] : [])
+      .map(profile => ({ value: encodeProfileRef(profile), label: profile.name }))
+      .filter(item => item.value);
+    return options.length ? [{ label: group.label, options }] : [];
+  });
+}
+
+export function getProfileEditState(profile) {
+  const readOnly = profile?.source === PROFILE_SOURCE.NATIVE;
+  return {
+    readOnly,
+    canSave: !readOnly,
+    canDelete: profile?.source === PROFILE_SOURCE.LOCAL,
+    canCopy: Boolean(profile),
+  };
+}
+
+const findProfile = (catalog, ref) => ref
+  ? catalog?.[ref.source]?.find(profile => profile.id === ref.id) ?? null
+  : null;
 
 // SillyTavern 1.16.0, public/index.html: #extensions_settings.
 export const findExtensionSettingsContainer = documentLike => documentLike.getElementById('extensions_settings');
@@ -19,10 +46,13 @@ export async function mountSettingsPanel(app) {
   const fields = {
     enabled: byId('cp-enabled'), profiles: byId('cp-profile-select'), name: byId('cp-profile-name'),
     url: byId('cp-profile-url'), model: byId('cp-profile-model'), secret: byId('cp-profile-secret'),
-    key: byId('cp-profile-key'), note: byId('cp-profile-note'), preset: byId('cp-preset-select'),
+    key: byId('cp-profile-key'), note: byId('cp-profile-note'), source: byId('cp-profile-source'),
+    preset: byId('cp-preset-select'),
     prompts: byId('cp-prompt-list'), status: byId('cp-settings-status'),
+    saveProfile: byId('cp-save-profile'), copyProfile: byId('cp-copy-profile'),
+    deleteProfile: byId('cp-delete-profile'), applyProfile: byId('cp-apply-profile'),
   };
-  let editingId = app.settings.activeProfileId;
+  let editingRef = app.settings.activeProfileRef;
 
   const status = (message, error = false) => {
     fields.status.textContent = message;
@@ -30,20 +60,47 @@ export async function mountSettingsPanel(app) {
   };
   const renderSecrets = selectedId => {
     fields.secret.replaceChildren(option('', '无需密钥 / 暂不选择'));
-    for (const secret of app.host.getSecrets()) fields.secret.append(option(secret.id, `${secret.label || '未命名密钥'}${secret.active ? '（当前）' : ''}`));
+    const secretIds = new Set();
+    for (const secret of app.host.getSecrets()) {
+      secretIds.add(secret.id);
+      fields.secret.append(option(secret.id, `${secret.label || '未命名密钥'}${secret.active ? '（当前）' : ''}`));
+    }
+    if (selectedId && !secretIds.has(selectedId)) fields.secret.append(option(selectedId, `${selectedId}（已不存在）`));
     fields.secret.value = selectedId || '';
   };
   const renderProfiles = () => {
+    const selectedRef = editingRef;
+    const catalog = app.getProfileCatalog();
+    const profile = findProfile(catalog, selectedRef);
+    const staleNative = selectedRef?.source === PROFILE_SOURCE.NATIVE && !profile;
+    if (!profile) editingRef = null;
+
     fields.profiles.replaceChildren(option('', '选择配置…'));
-    for (const profile of app.settings.profiles) fields.profiles.append(option(profile.id, profile.name));
-    fields.profiles.value = editingId || '';
-    const profile = app.settings.profiles.find(item => item.id === editingId);
+    for (const group of makeProfileGroups(catalog)) {
+      const element = Object.assign(document.createElement('optgroup'), { label: group.label });
+      for (const item of group.options) element.append(option(item.value, item.label));
+      fields.profiles.append(element);
+    }
+    fields.profiles.value = encodeProfileRef(editingRef);
     fields.name.value = profile?.name ?? '';
     fields.url.value = profile?.apiUrl ?? '';
     fields.model.value = profile?.model ?? '';
     fields.note.value = profile?.note ?? '';
     fields.key.value = '';
     renderSecrets(profile?.secretId);
+
+    const editState = getProfileEditState(profile);
+    for (const field of [fields.name, fields.url, fields.model, fields.note]) field.readOnly = editState.readOnly;
+    fields.secret.disabled = editState.readOnly;
+    fields.key.disabled = editState.readOnly;
+    fields.saveProfile.disabled = !editState.canSave;
+    fields.deleteProfile.disabled = !editState.canDelete;
+    fields.copyProfile.disabled = !editState.canCopy;
+    fields.applyProfile.disabled = !profile;
+    fields.source.textContent = profile?.source === PROFILE_SOURCE.NATIVE
+      ? '来源：酒馆现有配置（只读）'
+      : profile ? '来源：桌宠独立配置' : '新建桌宠独立配置';
+    if (staleNative) status('所选酒馆配置已不存在，请重新选择', true);
   };
   const renderPrompts = () => {
     fields.prompts.replaceChildren();
@@ -100,44 +157,65 @@ export async function mountSettingsPanel(app) {
 
   fields.enabled.checked = app.settings.enabled;
   fields.enabled.addEventListener('change', () => { app.settings.enabled = fields.enabled.checked; app.save(); app.refreshPet(); });
-  fields.profiles.addEventListener('change', () => { editingId = fields.profiles.value || null; renderProfiles(); });
+  fields.profiles.addEventListener('change', () => { editingRef = decodeProfileRef(fields.profiles.value); status(''); renderProfiles(); });
   fields.preset.addEventListener('change', renderPrompts);
   byId('cp-refresh-presets').addEventListener('click', refreshPresets);
-  byId('cp-new-profile').addEventListener('click', () => { editingId = null; renderProfiles(); fields.name.focus(); });
-  byId('cp-save-profile').addEventListener('click', async () => {
+  byId('cp-new-profile').addEventListener('click', () => { editingRef = null; status(''); renderProfiles(); fields.name.focus(); });
+  fields.saveProfile.addEventListener('click', async () => {
     try {
+      if (editingRef?.source === PROFILE_SOURCE.NATIVE) throw new Error('酒馆现有配置为只读，请先复制为桌宠配置');
       const name = fields.name.value.trim();
       const apiUrl = fields.url.value.trim();
       const model = fields.model.value.trim();
       if (!name || !apiUrl || !model) throw new Error('配置名称、API 地址和模型 ID 必填');
       let secretId = fields.secret.value;
       if (fields.key.value) secretId = await app.host.createSecret(fields.key.value, name);
-      const profile = { id: editingId || makeId(), name, apiUrl, model, secretId, note: fields.note.value.trim() };
+      const profile = { id: editingRef?.id || makeId(), name, apiUrl, model, secretId, note: fields.note.value.trim() };
       const index = app.settings.profiles.findIndex(item => item.id === profile.id);
       if (index >= 0) app.settings.profiles[index] = profile; else app.settings.profiles.push(profile);
-      editingId = profile.id;
-      app.settings.activeProfileId = profile.id;
+      editingRef = { source: PROFILE_SOURCE.LOCAL, id: profile.id };
       fields.key.value = '';
       app.save(); renderProfiles(); app.refreshPet(); status('配置已保存；API Key 仅写入酒馆原生 Secrets。');
     } catch (error) { status(error.message, true); }
   });
-  byId('cp-copy-profile').addEventListener('click', () => {
-    const source = app.settings.profiles.find(item => item.id === editingId);
-    if (!source) return status('请先选择要复制的配置', true);
-    const copy = { ...source, id: makeId(), name: `${source.name} 副本` };
-    app.settings.profiles.push(copy); editingId = copy.id; app.save(); renderProfiles(); app.refreshPet();
+  fields.copyProfile.addEventListener('click', () => {
+    const source = app.resolveProfile(editingRef);
+    if (!source) {
+      if (editingRef?.source === PROFILE_SOURCE.NATIVE) renderProfiles();
+      else status('请先选择要复制的配置', true);
+      return;
+    }
+    const copy = {
+      id: makeId(),
+      name: `${source.name} 副本`,
+      apiUrl: source.apiUrl,
+      model: source.model,
+      secretId: source.secretId,
+      note: source.note,
+    };
+    app.settings.profiles.push(copy);
+    editingRef = { source: PROFILE_SOURCE.LOCAL, id: copy.id };
+    app.save(); renderProfiles(); app.refreshPet();
   });
-  byId('cp-delete-profile').addEventListener('click', () => {
-    if (!editingId) return status('请先选择配置', true);
-    app.settings.profiles = app.settings.profiles.filter(item => item.id !== editingId);
-    if (app.settings.activeProfileId === editingId) app.settings.activeProfileId = null;
-    editingId = null; app.save(); renderProfiles(); app.refreshPet(); status('配置已删除，原生 Secret 未删除。');
+  fields.deleteProfile.addEventListener('click', () => {
+    if (editingRef?.source !== PROFILE_SOURCE.LOCAL) return status('请先选择桌宠独立配置', true);
+    app.settings.profiles = app.settings.profiles.filter(item => item.id !== editingRef.id);
+    if (app.settings.activeProfileRef?.source === PROFILE_SOURCE.LOCAL && app.settings.activeProfileRef.id === editingRef.id) {
+      app.settings.activeProfileRef = null;
+    }
+    editingRef = null; app.save(); renderProfiles(); app.refreshPet(); status('配置已删除，原生 Secret 未删除。');
   });
-  byId('cp-apply-profile').addEventListener('click', async () => {
-    const profile = app.settings.profiles.find(item => item.id === editingId);
-    if (!profile) return status('请先选择配置', true);
-    try { await app.applyProfile(profile); app.settings.activeProfileId = profile.id; app.save(); app.refreshPet(); status(`已应用：${profile.name}`); }
-    catch (error) { status(error.message, true); }
+  fields.applyProfile.addEventListener('click', async () => {
+    if (!editingRef) return status('请先选择配置', true);
+    const selectedRef = editingRef;
+    try {
+      const applied = await app.applyProfileRef(selectedRef);
+      app.settings.activeProfileRef = { ...selectedRef };
+      app.save(); app.refreshPet(); status(`已应用：${applied.name}`);
+    } catch (error) {
+      if (selectedRef.source === PROFILE_SOURCE.NATIVE && !app.resolveProfile(selectedRef)) renderProfiles();
+      else status(error.message, true);
+    }
   });
   byId('cp-reset-position').addEventListener('click', () => { app.settings.pet.x = null; app.settings.pet.y = null; app.save(); app.refreshPet(); status('桌宠位置已重置'); });
 

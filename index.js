@@ -1,4 +1,5 @@
 import { applyCustomProfile, createBrowserHost } from './src/host-adapter.js';
+import { listProfileCatalog, resolveProfileRef } from './src/profile-catalog.js';
 import { normalizeSettings, SETTINGS_KEY } from './src/settings.js';
 import { requireTavernHelper } from './src/preset-operations.js';
 import { mountSettingsPanel } from './src/settings-panel.js';
@@ -12,11 +13,19 @@ async function initialize() {
     host.context.extensionSettings[SETTINGS_KEY] = settings;
     let petWidget;
     const save = () => host.context.saveSettingsDebounced();
+    const getNativeProfiles = () => host.getNativeConnectionProfiles();
     const app = {
       host,
       settings,
       save,
-      applyProfile: profile => applyCustomProfile(host, profile),
+      getProfileCatalog: () => listProfileCatalog(settings.profiles, getNativeProfiles()),
+      resolveProfile: ref => resolveProfileRef(ref, settings.profiles, getNativeProfiles()),
+      async applyProfileRef(ref) {
+        const profile = this.resolveProfile(ref);
+        if (!profile) throw new Error('所选 API 配置已不存在，请重新选择');
+        await applyCustomProfile(host, profile);
+        return profile;
+      },
       refreshPet: () => petWidget?.refresh(),
     };
     petWidget = mountPetWidget(app);

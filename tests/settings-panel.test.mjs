@@ -13,3 +13,29 @@ test('uses the SillyTavern 1.16 extension settings container id', () => {
   assert.equal(settingsPanel.findExtensionSettingsContainer(documentLike), expected);
   assert.deepEqual(calls, ['extensions_settings']);
 });
+
+test('builds non-empty native and local selector groups', () => {
+  const groups = settingsPanel.makeProfileGroups({
+    native: [{ source: 'native', id: 'n1', name: '酒馆配置' }],
+    local: [{ source: 'local', id: 'l1', name: '桌宠配置' }],
+  });
+
+  assert.deepEqual(groups.map(group => group.label), ['酒馆现有配置', '桌宠独立配置']);
+  assert.match(groups[0].options[0].value, /^native:/);
+  assert.match(groups[1].options[0].value, /^local:/);
+});
+
+test('native selection is read-only while local selection is editable', () => {
+  assert.deepEqual(settingsPanel.getProfileEditState({ source: 'native' }), {
+    readOnly: true,
+    canSave: false,
+    canDelete: false,
+    canCopy: true,
+  });
+  assert.deepEqual(settingsPanel.getProfileEditState({ source: 'local' }), {
+    readOnly: false,
+    canSave: true,
+    canDelete: true,
+    canCopy: true,
+  });
+});
