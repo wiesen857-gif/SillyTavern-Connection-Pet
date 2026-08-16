@@ -13,7 +13,6 @@ export function createApp(host, settings, save, refreshPet) {
     save,
     getProfileCatalog: () => listProfileCatalog(settings.profiles, getNativeProfiles()),
     resolveProfile: ref => resolveProfileRef(ref, settings.profiles, getNativeProfiles()),
-    applyProfile: profile => applyCustomProfile(host, profile),
     async applyProfileRef(ref) {
       const profile = this.resolveProfile(ref);
       if (!profile) throw new Error('所选 API 配置已不存在，请重新选择');

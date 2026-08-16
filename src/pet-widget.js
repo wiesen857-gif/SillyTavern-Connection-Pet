@@ -1,6 +1,31 @@
 import { listPresetPrompts, switchPresetAndSetEntries } from './preset-operations.js';
+import { decodeProfileRef, encodeProfileRef, PROFILE_SOURCE } from './profile-catalog.js';
 
 const makeOption = (value, label) => Object.assign(document.createElement('option'), { value, textContent: label });
+
+export function renderProfileOptions(select, catalog) {
+  select.replaceChildren(makeOption('', '选择配置…'));
+  for (const [key, label] of [['native', '酒馆现有配置'], ['local', '桌宠独立配置']]) {
+    if (!catalog[key].length) continue;
+    const group = Object.assign(document.createElement('optgroup'), { label });
+    for (const profile of catalog[key]) group.append(makeOption(encodeProfileRef(profile), profile.name));
+    select.append(group);
+  }
+}
+
+export function renderProfileSummary(summary, app, selectedValue) {
+  const profile = app.resolveProfile(decodeProfileRef(selectedValue));
+  if (!profile) {
+    summary.textContent = '尚未选择配置';
+    return;
+  }
+  const source = document.createElement('div');
+  source.className = 'cp-source-badge';
+  source.textContent = profile.source === PROFILE_SOURCE.NATIVE ? '来源：酒馆现有配置' : '来源：桌宠独立配置';
+  const details = document.createElement('div');
+  details.textContent = `模型：${profile.model}\nURL：${profile.apiUrl}`;
+  summary.replaceChildren(source, details);
+}
 
 export function mountPetWidget(app) {
   const root = document.createElement('div');
@@ -49,10 +74,7 @@ export function mountPetWidget(app) {
     root.style.setProperty('--cp-size', `${size}px`);
     root.classList.toggle('is-left', app.settings.pet.x < window.innerWidth / 2);
   };
-  const renderProfileSummary = () => {
-    const profile = app.settings.profiles.find(item => item.id === profileSelect.value);
-    summary.textContent = profile ? `${profile.model}\n${profile.apiUrl}` : '尚未保存配置';
-  };
+  const renderSelectedProfileSummary = () => renderProfileSummary(summary, app, profileSelect.value);
   const renderPrompts = () => {
     promptList.replaceChildren();
     const presetName = presetSelect.value;
@@ -83,10 +105,11 @@ export function mountPetWidget(app) {
   const refresh = () => {
     root.hidden = !app.settings.enabled;
     clampPosition();
-    profileSelect.replaceChildren(makeOption('', '选择配置…'));
-    for (const profile of app.settings.profiles) profileSelect.append(makeOption(profile.id, profile.name));
-    profileSelect.value = app.settings.activeProfileId || '';
-    renderProfileSummary();
+    const selectedValue = encodeProfileRef(app.settings.activeProfileRef);
+    renderProfileOptions(profileSelect, app.getProfileCatalog());
+    profileSelect.value = selectedValue;
+    if (!profileSelect.value && selectedValue) showStatus('上次选择的 API 配置已不存在，请重新选择', true);
+    renderSelectedProfileSummary();
     const previousPreset = presetSelect.value;
     presetSelect.replaceChildren(makeOption('', '选择预设…'));
     try {
@@ -116,13 +139,20 @@ export function mountPetWidget(app) {
     root.querySelectorAll('.cp-tabs button').forEach(item => item.classList.toggle('is-active', item === button));
     root.querySelectorAll('.cp-tab-panel').forEach(panel => { panel.hidden = panel.dataset.panel !== button.dataset.tab; });
   }));
-  profileSelect.addEventListener('change', renderProfileSummary);
+  profileSelect.addEventListener('change', renderSelectedProfileSummary);
   presetSelect.addEventListener('change', renderPrompts);
   root.querySelector('.cp-pet-apply').addEventListener('click', async () => {
-    const profile = app.settings.profiles.find(item => item.id === profileSelect.value);
-    if (!profile) return showStatus('请先选择 API 配置', true);
-    try { await app.applyProfile(profile); app.settings.activeProfileId = profile.id; app.save(); refresh(); showStatus(`已应用：${profile.name}`); }
-    catch (error) { showStatus(error.message, true); }
+    const ref = decodeProfileRef(profileSelect.value);
+    if (!ref) return showStatus('请先选择 API 配置', true);
+    try {
+      const profile = await app.applyProfileRef(ref);
+      app.settings.activeProfileRef = ref;
+      app.save();
+      refresh();
+      showStatus(`已应用：${profile.name}`);
+    } catch (error) {
+      showStatus(error.message, true);
+    }
   });
   window.addEventListener('resize', clampPosition);
   refresh();

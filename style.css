@@ -25,6 +25,8 @@
 .cp-prompt-row.is-stale { color: #dca4ab; opacity: .82; }
 .cp-status { min-height: 1.4em; margin-top: 8px; color: #b9dfbd; font-size: .88em; }
 .cp-status.is-error { color: #f1a8b0; }
+.cp-source-badge { opacity: .72; font-size: .82em; }
+.cp-grid :disabled { opacity: .72; cursor: not-allowed; }
 
 #connection-pet-root { position: fixed; left: var(--cp-x); top: var(--cp-y); z-index: 32000; width: var(--cp-size); height: var(--cp-size); touch-action: none; }
 #connection-pet-root[hidden] { display: none; }
@@ -48,5 +50,9 @@
 @media (max-width: 600px) {
   .cp-grid { grid-template-columns: 1fr; }
   .cp-grid .cp-wide { grid-column: auto; }
+  .connection-pet-settings .cp-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .connection-pet-settings .cp-actions .menu_button { width: 100%; min-width: 0; white-space: normal; }
+  .connection-pet-settings .cp-actions .cp-apply-wide { grid-column: 1 / -1; }
+  .cp-pet-apply { width: 100%; }
   .cp-popover { position: fixed; left: 12px; right: 12px; top: auto; bottom: 12px; width: auto; max-height: 72vh; overflow: auto; }
 }
