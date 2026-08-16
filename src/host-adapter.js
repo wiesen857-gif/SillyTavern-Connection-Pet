@@ -17,22 +17,43 @@ export function readNativeConnectionProfiles(context) {
 
 const quoted = value => `"${validateCommandValue(value)}"`;
 
-export async function applyCustomProfile(host, profile) {
+const isConnectedStatus = status => {
+  const normalized = typeof status === 'string' ? status.trim() : '';
+  return normalized !== '' && normalized !== 'no_connection';
+};
+
+async function waitForConnection(host, { connectionTimeoutMs = 5000, connectionPollIntervalMs = 100 } = {}) {
+  const deadline = Date.now() + connectionTimeoutMs;
+  while (true) {
+    if (isConnectedStatus(host.getConnectionStatus?.())) return;
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) throw new Error('Custom API 连接失败或超时');
+    await new Promise(resolve => setTimeout(resolve, Math.min(connectionPollIntervalMs, remaining)));
+  }
+}
+
+export async function applyCustomProfile(host, profile, waitOptions) {
   const apiUrl = validateCommandValue(profile?.apiUrl);
   const model = validateCommandValue(profile?.model);
+  const secretId = profile?.secretId ? validateCommandValue(profile.secretId) : '';
   let parsed;
   try { parsed = new URL(apiUrl); } catch { throw new Error('API 地址不是有效 URL'); }
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('API 地址仅支持 http 或 https');
 
-  if (profile.secretId && typeof host.hasSecret === 'function' && !host.hasSecret(profile.secretId)) {
+  if (secretId && typeof host.hasSecret === 'function' && !host.hasSecret(secretId)) {
     throw new Error('配置引用的酒馆 Secret 已不存在或不可用');
   }
 
   await host.run(`/api-url api=custom connect=false quiet=true ${quoted(apiUrl)}`);
-  if (profile.secretId) await host.rotateSecret(CUSTOM_SECRET_KEY, validateCommandValue(profile.secretId));
+  if (secretId) {
+    await host.rotateSecret(CUSTOM_SECRET_KEY, secretId);
+    const activeSecret = host.getSecrets?.().find(row => row.id === secretId && row.active === true);
+    if (!activeSecret) throw new Error('配置引用的酒馆 Secret 未能激活');
+  }
   await host.run('/api quiet=true custom');
   await host.run(`/model quiet=true ${quoted(model)}`);
   await host.run(`/api-url api=custom connect=true quiet=true ${quoted(apiUrl)}`);
+  await waitForConnection(host, waitOptions);
 }
 
 export async function createBrowserHost() {
@@ -58,6 +79,7 @@ export async function createBrowserHost() {
     },
     getSecrets,
     hasSecret: id => getSecrets().some(row => row.id === id),
+    getConnectionStatus: () => globalThis.SillyTavern?.getContext?.()?.onlineStatus,
     getNativeConnectionProfiles: () => readNativeConnectionProfiles(context),
   };
 }

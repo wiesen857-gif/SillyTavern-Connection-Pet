@@ -23,6 +23,8 @@ test('exposes only the tagged-reference profile application entry', async () => 
     }],
     run: async command => calls.push(['run', command]),
     rotateSecret: async (key, id) => calls.push(['rotate', key, id]),
+    getSecrets: () => [{ id: 'secret-1', active: true }],
+    getConnectionStatus: () => 'Valid',
   };
   const app = indexModule.createApp(host, { profiles: [] }, () => {}, () => {});
 
