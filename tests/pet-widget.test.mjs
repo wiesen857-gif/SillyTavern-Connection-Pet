@@ -54,17 +54,33 @@ test('resolves a tagged selection and renders its source, model, and URL', () =>
   }
 });
 
-test('builds a one-click preset request from checked allowlisted entries only', () => {
-  assert.equal(typeof petWidget.buildEnabledEntryRequest, 'function');
+test('builds final enabled states for every available allowlisted entry', () => {
+  assert.equal(typeof petWidget.buildEntryStateRequest, 'function');
+  const allowed = [
+    { promptId: 'adult', lastKnownName: '一键开启瑟瑟' },
+    { promptId: 'style', lastKnownName: '文风增强' },
+    { promptId: 'stale', lastKnownName: '已失效条目' },
+  ];
+
+  const request = petWidget.buildEntryStateRequest(
+    allowed,
+    ['adult', 'not-allowed'],
+    ['adult', 'style'],
+  );
+
+  assert.deepEqual([...request.states], [['adult', true], ['style', false]]);
+  assert.deepEqual([...request.allowedIds], ['adult', 'style', 'stale']);
+});
+
+test('allows applying with every available allowlisted entry unchecked', () => {
   const allowed = [
     { promptId: 'adult', lastKnownName: '一键开启瑟瑟' },
     { promptId: 'style', lastKnownName: '文风增强' },
   ];
 
-  const request = petWidget.buildEnabledEntryRequest(allowed, ['adult', 'not-allowed']);
+  const request = petWidget.buildEntryStateRequest(allowed, [], ['adult', 'style']);
 
-  assert.deepEqual([...request.states], [['adult', true]]);
-  assert.deepEqual([...request.allowedIds], ['adult', 'style']);
+  assert.deepEqual([...request.states], [['adult', false], ['style', false]]);
 });
 
 test('profile summary explicitly marks missing API fields', () => {

@@ -17,14 +17,14 @@ function fakeHelper() {
 
 test('switches first, changes only requested allowlisted entries, then renders', async () => {
   const helper = fakeHelper();
-  await switchPresetAndSetEntries(helper, 'Demo', new Map([['a', true]]), new Set(['a']));
+  await switchPresetAndSetEntries(helper, 'Demo', new Map([['a', true], ['b', false]]), new Set(['a', 'b']));
 
   assert.deepEqual(helper.calls.map(call => call.slice(0, 2)), [
     ['get', 'Demo'], ['load', 'Demo'], ['get', 'in_use'], ['replace', 'in_use'],
   ]);
   const replaced = helper.calls.at(-1)[2];
   assert.equal(replaced.prompts.find(x => x.id === 'a').enabled, true);
-  assert.equal(replaced.prompts.find(x => x.id === 'b').enabled, true);
+  assert.equal(replaced.prompts.find(x => x.id === 'b').enabled, false);
   assert.deepEqual(helper.calls.at(-1)[3], { render: 'immediate' });
 });
 

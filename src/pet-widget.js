@@ -34,11 +34,12 @@ export function renderProfileSummary(summary, app, selectedValue) {
   summary.replaceChildren(...children);
 }
 
-export function buildEnabledEntryRequest(allowed, checkedIds) {
+export function buildEntryStateRequest(allowed, checkedIds, availableIds) {
   const allowedIds = new Set(allowed.map(item => String(item.promptId)));
   const checked = new Set([...checkedIds].map(String));
+  const available = new Set([...availableIds].map(String));
   return {
-    states: new Map([...allowedIds].filter(id => checked.has(id)).map(id => [id, true])),
+    states: new Map([...allowedIds].filter(id => available.has(id)).map(id => [id, checked.has(id)])),
     allowedIds,
   };
 }
@@ -105,14 +106,16 @@ export function mountPetWidget(app) {
         presetApply.disabled = true;
         const empty = document.createElement('p'); empty.className = 'cp-empty'; empty.textContent = '此预设还没有待开启条目'; promptList.append(empty); return;
       }
+      let availableCount = 0;
       for (const item of allowed) {
         const prompt = prompts.get(item.promptId);
         const label = document.createElement('label'); label.className = `cp-prompt-row${prompt ? '' : ' is-stale'}`;
         const input = Object.assign(document.createElement('input'), { type: 'checkbox', checked: Boolean(prompt?.enabled), disabled: !prompt });
-        if (prompt) input.dataset.promptId = item.promptId;
+        if (prompt) { input.dataset.promptId = item.promptId; availableCount += 1; }
         const name = document.createElement('span'); name.textContent = prompt?.name ?? `${item.lastKnownName}（已失效）`;
         label.append(input, name); promptList.append(label);
       }
+      presetApply.disabled = availableCount === 0;
     } catch (error) { showStatus(error.message, true); }
   };
   const refresh = () => {
@@ -171,17 +174,19 @@ export function mountPetWidget(app) {
     const presetName = presetSelect.value;
     if (!presetName) return showStatus('请先选择预设', true);
     const allowed = app.settings.presetAllowlist[presetName] ?? [];
-    const checkedIds = [...promptList.querySelectorAll('input[data-prompt-id]:checked')]
-      .map(input => input.dataset.promptId);
-    const request = buildEnabledEntryRequest(allowed, checkedIds);
-    if (!request.states.size) return showStatus('请至少勾选一个待开启条目', true);
+    const availableInputs = [...promptList.querySelectorAll('input[data-prompt-id]')];
+    const availableIds = availableInputs.map(input => input.dataset.promptId);
+    const checkedIds = availableInputs.filter(input => input.checked).map(input => input.dataset.promptId);
+    const request = buildEntryStateRequest(allowed, checkedIds, availableIds);
+    if (!request.states.size) return showStatus('此预设没有可操作的待开启条目', true);
 
     const originalText = presetApply.textContent;
     presetApply.disabled = true;
     presetApply.textContent = '应用中…';
     try {
       await switchPresetAndSetEntries(app.host.helper, presetName, request.states, request.allowedIds);
-      showStatus(`已应用预设“${presetName}”并开启 ${request.states.size} 个条目`);
+      const enabledCount = [...request.states.values()].filter(Boolean).length;
+      showStatus(`已应用预设“${presetName}”：开启 ${enabledCount} 个，关闭 ${request.states.size - enabledCount} 个条目`);
       renderPrompts();
     } catch (error) {
       showStatus(error.message, true);
