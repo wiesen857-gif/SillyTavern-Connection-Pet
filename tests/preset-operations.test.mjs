@@ -7,25 +7,38 @@ function fakeHelper() {
   const stored = {
     Demo: { prompts: [{ id: 'a', name: 'A', enabled: false }, { id: 'b', name: 'B', enabled: true }], settings: {}, prompts_unused: [], extensions: {} },
   };
+  let inUse = structuredClone(stored.Demo);
   return {
     calls,
-    getPreset(name) { calls.push(['get', name]); return structuredClone(name === 'in_use' ? stored.Demo : stored[name]); },
-    loadPreset(name) { calls.push(['load', name]); return Boolean(stored[name]); },
-    async replacePreset(name, preset, options) { calls.push(['replace', name, preset, options]); },
+    getPreset(name) { calls.push(['get', name]); return structuredClone(name === 'in_use' ? inUse : stored[name]); },
+    loadPreset(name) {
+      calls.push(['load', name]);
+      if (!stored[name]) return false;
+      inUse = structuredClone(stored[name]);
+      return true;
+    },
+    async replacePreset(name, preset, options) {
+      calls.push(['replace', name, structuredClone(preset), options]);
+      if (name === 'in_use') inUse = structuredClone(preset);
+      else stored[name] = structuredClone(preset);
+    },
   };
 }
 
-test('switches first, changes only requested allowlisted entries, then renders', async () => {
+test('switches first, persists requested states to the named preset, then renders the active preset', async () => {
   const helper = fakeHelper();
   await switchPresetAndSetEntries(helper, 'Demo', new Map([['a', true], ['b', false]]), new Set(['a', 'b']));
 
   assert.deepEqual(helper.calls.map(call => call.slice(0, 2)), [
-    ['get', 'Demo'], ['load', 'Demo'], ['get', 'in_use'], ['replace', 'in_use'],
+    ['get', 'Demo'], ['load', 'Demo'], ['get', 'in_use'], ['replace', 'Demo'], ['replace', 'in_use'],
   ]);
-  const replaced = helper.calls.at(-1)[2];
-  assert.equal(replaced.prompts.find(x => x.id === 'a').enabled, true);
-  assert.equal(replaced.prompts.find(x => x.id === 'b').enabled, false);
-  assert.deepEqual(helper.calls.at(-1)[3], { render: 'immediate' });
+  const saved = helper.getPreset('Demo');
+  assert.equal(saved.prompts.find(x => x.id === 'a').enabled, true);
+  assert.equal(saved.prompts.find(x => x.id === 'b').enabled, false);
+  const activeReplace = helper.calls.find(call => call[0] === 'replace' && call[1] === 'in_use');
+  assert.deepEqual(activeReplace?.[3], { render: 'immediate' });
+  helper.loadPreset('Demo');
+  assert.equal(helper.getPreset('in_use').prompts.find(x => x.id === 'b').enabled, false);
 });
 
 test('rejects non-allowlisted and stale IDs before switching preset', async () => {

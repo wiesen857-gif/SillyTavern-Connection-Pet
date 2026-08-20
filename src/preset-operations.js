@@ -53,6 +53,7 @@ export async function switchPresetAndSetEntries(helper, presetName, requestedSta
     const id = String(prompt.id);
     if (requestedStates.has(id)) prompt.enabled = Boolean(requestedStates.get(id));
   }
+  await helper.replacePreset(presetName, structuredClone(inUse));
   await helper.replacePreset('in_use', inUse, { render: 'immediate' });
   return inUse;
 }
